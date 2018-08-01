@@ -6,16 +6,16 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use failure::Error;
-use failure::bail;
 use structopt::StructOpt;
 
-use sgbasm_lib::SourceFile;
 use sgbasm_lib;
 
 #[derive(StructOpt)]
 struct Options {
     #[structopt(parse(from_os_str))]
     output: Option<PathBuf>,
+    #[structopt(parse(from_os_str))]
+    new_project: Option<PathBuf>,
 }
 
 fn main() {
@@ -28,15 +28,11 @@ fn run() -> Result<(), Error> {
     let options = Options::from_args();
 
     let source_files = sgbasm_lib::source_files()?;
+    let rom = sgbasm_lib::source_to_rom(&source_files)?;
 
-    if let Some(SourceFile::Asm(_)) = source_files.get("main") {
-        let output = options.output.unwrap_or(env::current_dir()?.join("out.gb"));
-        let mut output_file = File::create(output)?;
+    let output = options.output.unwrap_or(env::current_dir()?.join("out.gb"));
+    let mut output_file = File::create(output)?;
+    output_file.write(&rom)?;
 
-        let rom: Vec<u8> = vec!();
-        output_file.write(&rom)?;
-        Ok(())
-    } else {
-        bail!("No main.asm file");
-    }
+    Ok(())
 }

@@ -51,3 +51,41 @@ pub fn source_files() -> Result<HashMap<String, SourceFile>, Error> {
     }
     Ok(source_files)
 }
+
+static LOGO: [u8; 0x30] = [0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00,
+                           0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89,
+                           0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB,
+                           0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F,
+                           0xBB, 0xB9, 0x33, 0x3E];
+
+pub fn source_to_rom(source_files: &HashMap<String, SourceFile>) -> Result<Vec<u8>, Error> {
+    if let Some(SourceFile::Asm(_)) = source_files.get("main") {
+        let name = String::from("Heartache");
+
+        let mut rom: Vec<u8> = vec!();
+
+        for _ in 0..256 {
+            rom.push(0);
+        }
+        rom.push(0x0);
+
+        // jump to 0x0 because why not
+        rom.push(0xc3);
+        rom.push(0x00);
+        rom.push(0x00);
+
+        rom.extend(LOGO.iter());
+
+        rom.extend(name.as_bytes());
+        rom.push(0x00);
+
+        // fill up 32 KB remaining
+        for _ in 0..0x8000-rom.len() {
+            rom.push(0x00);
+        }
+
+        Ok(rom)
+    } else {
+        bail!("No main.asm file");
+    }
+}
