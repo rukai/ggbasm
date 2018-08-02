@@ -6,7 +6,7 @@ use std::io::Write;
 
 use failure::Error;
 
-use ggbasm::RomBuilder;
+use ggbasm::rom_builder::RomBuilder;
 use ggbasm::header::{Header, ColorSupport, CartridgeType, RamType};
 
 fn main() {
