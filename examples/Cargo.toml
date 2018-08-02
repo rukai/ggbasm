@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "empty"
+]
+
+[profile.release]
+debug-assertions = true

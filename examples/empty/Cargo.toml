@@ -1,13 +1,11 @@
 cargo-features = ["edition"]
 
 [package]
-name = "sgbasm"
+name = "empty"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 edition = '2018'
 
 [dependencies]
-sgbasm_lib = { path = "../sgbasm_lib" }
-clap = "2"
-structopt = "0.2"
+ggbasm = { path = "../.." }
 failure = "0.1"

@@ -1,11 +1,11 @@
 cargo-features = ["edition"]
 
 [package]
-name = "ggbasm"
+name = "custom_header"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 edition = '2018'
 
 [dependencies]
-nom = "4"
+ggbasm = { path = "../.." }
 failure = "0.1"
