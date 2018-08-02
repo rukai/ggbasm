@@ -12,7 +12,7 @@ use failure::bail;
 
 pub mod header;
 
-use crate::header::Header;
+use crate::header::{Header, CartridgeType};
 
 pub enum Instruction {
     Label (String),
@@ -31,6 +31,17 @@ pub enum Data {
     Binary       (Vec<u8>),
     Header (Header),
     DummyInterruptsAndJumps,
+}
+
+impl Data {
+    pub fn len(&self) -> usize {
+        match self {
+            Data::Instructions (instructions) => instructions.iter().map(|x| x.bytes().len()).sum(),
+            Data::Binary (bytes)              => bytes.len(),
+            Data::Header (_)                  => 0x45,
+            Data::DummyInterruptsAndJumps     => 0x104,
+        }
+    }
 }
 
 pub enum DataSource {
@@ -65,8 +76,11 @@ impl RomBuilder {
         }
     }
 
-    /// Adds dummy intterupt and jump data at 0x0000 to 0x0103.
-    /// Returns an error if address is not at 0x0000.
+    /// Adds dummy intterupt and jump data from 0x0000 to 0x0103.
+    /// The entry point jumps to 0x0150.
+    /// The interrupts return immediately.
+    /// The RST commands jump to the entry point.
+    /// Returns an error if the RomBuilder address is not at 0x0000.
     pub fn add_dummy_interrupts_and_jumps(mut self) -> Result<Self, Error> {
         if self.address != 0x0000 {
             bail!("Attempted to add header data when address != 0x0000");
@@ -83,7 +97,7 @@ impl RomBuilder {
     }
 
     /// Adds provided header data at 0x0104 to 0x149.
-    /// Returns an error if address is not at 0x104
+    /// Returns an error if the RomBuilder address is not at 0x104
     pub fn add_header(mut self, header: Header) -> Result<Self, Error> {
         if self.address != 0x0104 {
             bail!("Attempted to add header data when address != 0x0104");
@@ -103,7 +117,7 @@ impl RomBuilder {
 
         self.data.push(DataHolder {
             data:    Data::Header (header),
-            address: 0,
+            address: self.address,
             source:  DataSource::Code,
         });
         self.address = 0x149;
@@ -142,7 +156,7 @@ impl RomBuilder {
     /// Sets the current address and bank as specified.
     /// Returns an error if attempts to go backwards.
     pub fn advance_address(mut self, address: u32, rom_bank: u32) -> Result<Self, Error> {
-        let new_address = address + rom_bank * 0x4000;
+        let new_address = address + rom_bank * ROM_BANK_SIZE;
         if new_address >= self.address {
             bail!("Attempted to advance to a previous address")
         } else {
@@ -158,20 +172,44 @@ impl RomBuilder {
 
     /// Gets the current address within the current bank
     pub fn get_address_bank(&self) -> u32 {
-        self.address % 0x4000
+        self.address % ROM_BANK_SIZE
     }
 
     /// Gets the current address within the current bank
     pub fn get_bank(&self) -> u32 {
-        self.address / 0x4000
+        self.address / ROM_BANK_SIZE
     }
 
     /// Compiles assembly and binary data into binary rom data
     pub fn compile(self) -> Result<Vec<u8>, Error> {
         let mut rom = vec!();
 
-        // TODO: Calculate smallest rom the data will fit in. (Address of last data + its length)
-        let size = 0x8000;
+        let rom_size_factor = if let Some(data) = self.data.last() {
+            let size = data.address + data.data.len() as u32;
+            if size <= ROM_BANK_SIZE * 2 {
+                0
+            } else if size <= ROM_BANK_SIZE * 4 {
+                1
+            } else if size <= ROM_BANK_SIZE * 8 {
+                2
+            } else if size <= ROM_BANK_SIZE * 16 {
+                3
+            } else if size <= ROM_BANK_SIZE * 32 {
+                4
+            } else if size <= ROM_BANK_SIZE * 64 {
+                5
+            } else if size <= ROM_BANK_SIZE * 128 {
+                6
+            } else if size <= ROM_BANK_SIZE * 256 {
+                7
+            } else if size <= ROM_BANK_SIZE * 512 {
+                8
+            } else {
+                bail!("ROM is too big, there is no MBC that supports a ROM size larger than 8MB, raw ROM size was {}", size);
+            }
+        } else {
+            bail!("No instructions or binary data was added to the RomBuilder");
+        };
 
         for data in self.data {
             match data.data {
@@ -207,14 +245,14 @@ impl RomBuilder {
                         rom.push(0x00);
                     }
 
-                    // jump to 0x0 because why not
+                    // jump to 0x0150 because why not
                     rom.push(0x00);
                     rom.push(0xc3);
-                    rom.push(0x00);
-                    rom.push(0x00);
+                    rom.push(0x01);
+                    rom.push(0x50);
                 }
                 Data::Header (header) => {
-                    header.write(&mut rom);
+                    header.write(&mut rom, rom_size_factor as u8);
                 }
                 Data::Binary (_) => {
                     // TODO
@@ -230,11 +268,75 @@ impl RomBuilder {
             }
         }
 
+        if rom.len() < 0x14F {
+            bail!("ROM is too small, header is not finished.");
+        }
+
+        // verify cartridge_type and rom_size_factor are compatible
+        let cartridge_type = CartridgeType::variant(rom[0x0147]);
+        let final_size_factor = rom[0x0148];
+        let final_size = (ROM_BANK_SIZE * 2) << final_size_factor;
+        match cartridge_type {
+            CartridgeType::RomOnly | CartridgeType::RomRam | CartridgeType::RomRamBattery => {
+                if final_size_factor != 0 {
+                    bail!("ROM is too big, there is no MBC so ROM size must be <= 32KB, was actually {}", final_size);
+                }
+            }
+            CartridgeType::Mbc1 | CartridgeType::Mbc1Ram |CartridgeType::Mbc1RamBattery => {
+                if final_size_factor > 6 {
+                    bail!("ROM is too big, using MBC1 so ROM size must be <= 2MB, was actually {}", final_size);
+                }
+            }
+            CartridgeType::Mbc2 | CartridgeType::Mbc2Battery => {
+                if final_size_factor > 3 {
+                    bail!("ROM is too big, using MBC2 so ROM size must be <= 256KB, was actually {}", final_size);
+                }
+            }
+            CartridgeType::Mmm01 | CartridgeType::Mmm01Ram | CartridgeType::Mmm01RamBattery => {
+                // TODO
+            }
+            CartridgeType::Mbc3TimerBattery | CartridgeType::Mbc3TimerRamBattery | CartridgeType::Mbc3 |
+            CartridgeType::Mbc3Ram | CartridgeType::Mbc3RamBattery => {
+                if final_size_factor > 6 {
+                    bail!("ROM is too big, using MBC3 so ROM size must be <= 2MB, was actually {}", final_size);
+                }
+            }
+            CartridgeType::Mbc5 | CartridgeType::Mbc5Ram | CartridgeType::Mbc5RamBattery |
+            CartridgeType::Mbc5Rumble | CartridgeType::Mbc5RumbleRam | CartridgeType::Mbc5RumbleRamBattery => {
+                if final_size_factor > 8 {
+                    bail!("ROM is too big, using MBC5 so ROM size must be <= 8MB, was actually {}", final_size);
+                }
+            }
+            CartridgeType::PocketCamera => {
+                if final_size_factor > 8 {
+                    bail!("ROM is too big, using PocketCamera so ROM size must be <= 1MB, was actually {}", final_size);
+                }
+            }
+            CartridgeType::HuC3 => {
+                // TODO
+            }
+            CartridgeType::HuC1RamBattery => {
+                if final_size_factor > 6 {
+                    bail!("ROM is too big, using HuC1 so ROM size must be <= 2MB, was actually {}", final_size);
+                }
+            }
+            CartridgeType::Unknown (_) => {
+                // Hopefully you know what your doing ...
+            }
+        }
+
         // pad remainder of rom with 0's to fill size
-        for _ in 0..size-rom.len() {
+        for _ in 0..final_size-rom.len() as u32 {
             rom.push(0x00);
         }
 
         Ok(rom)
     }
 }
+
+pub const CPU_SPEED_HZ:  u32 = 4_194_304;
+pub const ROM_BANK_SIZE: u32 = 0x4000;
+pub const RAM_BANK_SIZE: u32 = 0x2000;
+pub const SCREEN_WIDTH:  u32 = 160;
+pub const SCREEN_HEIGHT: u32 = 144;
+pub const SCREEN_PIXELS: u32 = SCREEN_WIDTH * SCREEN_HEIGHT;

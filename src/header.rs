@@ -39,9 +39,6 @@ pub enum CartridgeType {
     Mbc3,
     Mbc3Ram,
     Mbc3RamBattery,
-    Mbc4,
-    Mbc4Ram,
-    Mbc4RamBattery,
     Mbc5,
     Mbc5Ram,
     Mbc5RamBattery,
@@ -51,6 +48,7 @@ pub enum CartridgeType {
     PocketCamera,
     HuC3,
     HuC1RamBattery,
+    Unknown (u8)
 }
 
 impl CartridgeType {
@@ -72,9 +70,6 @@ impl CartridgeType {
             CartridgeType::Mbc3                 => 0x11,
             CartridgeType::Mbc3Ram              => 0x12,
             CartridgeType::Mbc3RamBattery       => 0x13,
-            CartridgeType::Mbc4                 => 0x15,
-            CartridgeType::Mbc4Ram              => 0x16,
-            CartridgeType::Mbc4RamBattery       => 0x17,
             CartridgeType::Mbc5                 => 0x19,
             CartridgeType::Mbc5Ram              => 0x1A,
             CartridgeType::Mbc5RamBattery       => 0x1B,
@@ -84,6 +79,38 @@ impl CartridgeType {
             CartridgeType::PocketCamera         => 0xFC,
             CartridgeType::HuC3                 => 0xFE,
             CartridgeType::HuC1RamBattery       => 0xFF,
+            CartridgeType::Unknown (value)      => *value,
+        }
+    }
+
+    pub fn variant(value: u8) -> CartridgeType {
+        match value {
+            0x00 => CartridgeType::RomOnly,
+            0x01 => CartridgeType::Mbc1,
+            0x02 => CartridgeType::Mbc1Ram,
+            0x03 => CartridgeType::Mbc1RamBattery,
+            0x05 => CartridgeType::Mbc2,
+            0x06 => CartridgeType::Mbc2Battery,
+            0x08 => CartridgeType::RomRam,
+            0x09 => CartridgeType::RomRamBattery,
+            0x0B => CartridgeType::Mmm01,
+            0x0C => CartridgeType::Mmm01Ram,
+            0x0D => CartridgeType::Mmm01RamBattery,
+            0x0F => CartridgeType::Mbc3TimerBattery,
+            0x10 => CartridgeType::Mbc3TimerRamBattery,
+            0x11 => CartridgeType::Mbc3,
+            0x12 => CartridgeType::Mbc3Ram,
+            0x13 => CartridgeType::Mbc3RamBattery,
+            0x19 => CartridgeType::Mbc5,
+            0x1A => CartridgeType::Mbc5Ram,
+            0x1B => CartridgeType::Mbc5RamBattery,
+            0x1C => CartridgeType::Mbc5Rumble,
+            0x1D => CartridgeType::Mbc5RumbleRam,
+            0x1E => CartridgeType::Mbc5RumbleRamBattery,
+            0xFC => CartridgeType::PocketCamera,
+            0xFE => CartridgeType::HuC3,
+            0xFF => CartridgeType::HuC1RamBattery,
+            a    => CartridgeType::Unknown (a)
         }
     }
 }
@@ -122,7 +149,7 @@ pub struct Header {
 }
 
 impl Header {
-    pub fn write(&self, rom: &mut Vec<u8>) {
+    pub fn write(&self, rom: &mut Vec<u8>, rom_size_factor: u8) {
         rom.extend(LOGO.iter());
         let title = self.title.as_bytes();
         rom.extend(title);
@@ -139,7 +166,7 @@ impl Header {
         }
         rom.push(if self.sgb_support { 0x03 } else { 0x00 });
         rom.push(self.cartridge_type.byte());
-        rom.push(0x00); // TODO: use calculated size in header
+        rom.push(rom_size_factor);
         rom.push(self.ram_type.byte());
         rom.push(if self.japanese { 0x00 } else { 0x01 });
         rom.push(0x33); // we are using the new licence, so set old licence accordingly
