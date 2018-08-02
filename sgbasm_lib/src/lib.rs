@@ -38,7 +38,7 @@ pub fn source_files() -> Result<HashMap<String, SourceFile>, Error> {
             if let Some(extension) = extension.to_str() {
                 let source_file = match extension.to_lowercase().as_ref() {
                     "asm" => SourceFile::Asm (parse_asm(&path)?),
-                    "inc" => SourceFile::Binary (load_binary(&path)?),
+                    "bin" => SourceFile::Binary (load_binary(&path)?),
                     _ => { continue; }
                 };
                 if let Some(file_stem) = path.file_stem() {

@@ -17,9 +17,11 @@ struct Options {
     #[structopt(short="o", long="output", parse(from_os_str))]
     output: Option<PathBuf>,
 
+    // TODO: Split this off into a subcommand like `cargo run` then have arguments for mbc chip,
+    // rom size etc. Then we can use this to generate better default asm files
     /// Create a new sgbasm project
-    #[structopt(short="n", long="new", parse(from_os_str))]
-    new: Option<PathBuf>,
+    #[structopt(short="n", long="new")]
+    new: Option<String>,
 }
 
 fn main() {
@@ -32,9 +34,10 @@ fn run() -> Result<(), Error> {
     let options = Options::from_args();
 
     if let Some(new) = options.new {
-        fs::create_dir_all(&new)?;
-        File::create(new.join("main.asm"))?;
-        println!("Created new project: {:?}", new);
+        let new_path = env::current_dir()?.join(&new);
+        fs::create_dir_all(&new_path)?;
+        File::create(new_path.join("main.asm"))?;
+        println!("Created new project: {}", new);
     }
     else {
         let source_files = sgbasm_lib::source_files()?;
