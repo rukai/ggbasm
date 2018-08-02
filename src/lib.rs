@@ -10,6 +10,10 @@ use std::path::{PathBuf, Path};
 use failure::Error;
 use failure::bail;
 
+pub mod header;
+
+use crate::header::Header;
+
 pub enum Instruction {
     Label (String),
     Nop
@@ -38,11 +42,6 @@ pub struct DataHolder {
     data:    Data,
     source:  DataSource,
     address: u32,
-}
-
-pub struct Header {
-    pub title: String,
-    /* TODO */
 }
 
 /// Keeps track of the state of a rom as it is being constructed.
@@ -90,8 +89,16 @@ impl RomBuilder {
             bail!("Attempted to add header data when address != 0x0104");
         }
 
-        if header.title.as_bytes().len() > 11 {
-            bail!("Header title was larger than 11 characters.");
+        if header.title.as_bytes().len() > 0x10 {
+            bail!("Header title was larger than 16 bytes.");
+        }
+
+        if header.title.as_bytes().len() == 0x10 && header.color_support.is_supported() {
+            bail!("Header title was 16 bytes while supporting color.");
+        }
+
+        if header.licence.as_bytes().len() > 2 {
+            bail!("Header licence was larger than 2 bytes.");
         }
 
         self.data.push(DataHolder {
@@ -207,10 +214,7 @@ impl RomBuilder {
                     rom.push(0x00);
                 }
                 Data::Header (header) => {
-                    rom.extend(LOGO.iter());
-                    rom.extend(header.title.as_bytes());
-
-                    // TODO: use calculated size in header
+                    header.write(&mut rom);
                 }
                 Data::Binary (_) => {
                     // TODO
@@ -234,9 +238,3 @@ impl RomBuilder {
         Ok(rom)
     }
 }
-
-static LOGO: [u8; 0x30] = [0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00,
-                           0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89,
-                           0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB,
-                           0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F,
-                           0xBB, 0xB9, 0x33, 0x3E];

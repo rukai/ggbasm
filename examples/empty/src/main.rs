@@ -6,7 +6,8 @@ use std::io::Write;
 
 use failure::Error;
 
-use ggbasm::{RomBuilder, Header};
+use ggbasm::RomBuilder;
+use ggbasm::header::{Header, ColorSupport, CartridgeType, RamType};
 
 fn main() {
     if let Err(error) = run() {
@@ -16,7 +17,14 @@ fn main() {
 
 fn run() -> Result<(), Error> {
     let header = Header {
-        title: String::from("Heartache"),
+        title:          String::from("Empty"),
+        color_support:  ColorSupport::Unsupported,
+        licence:        String::new(),
+        sgb_support:    false,
+        cartridge_type: CartridgeType::RomOnly,
+        ram_type:       RamType::None,
+        japanese:       false,
+        version_number: 0,
     };
 
     let rom = RomBuilder::new()
