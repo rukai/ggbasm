@@ -1,9 +1,14 @@
 # GGBASM (Generating Gameboy Assembler)
+[![Build Status](https://travis-ci.org/rukai/ggbasm.svg?branch=master)](https://travis-ci.org/rukai/ggbasm) [![dependency status](https://deps.rs/repo/github/rukai/ggbasm/status.svg)](https://deps.rs/repo/github/rukai/ggbasm) [![Crates.io](https://img.shields.io/crates/v/ggbasm.svg)](https://crates.io/crates/ggbasm)
 
 A gameboy assembler as a rust crate library.
 Being a library instead of command line application, allows for an elegant combination of:
 *   raw bytes and instructions generated from rust code
 *   instructions read from *.asm files.
+
+## Development Status
+
+This library is extremely WIP.
 
 ## RomBuilder
 

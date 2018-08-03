@@ -1,0 +1,26 @@
+language: rust
+rust:
+  - nightly
+  - stable
+
+cache: cargo
+
+script:
+  - cargo test
+  - cargo test --release
+  - cd examples
+  - cargo build
+  - cargo build --release
+  - cd asm_header
+  - cargo run
+  - cargo run --release
+  - cd ../empty
+  - cargo run
+  - cargo run --release
+  - cd ../ferris
+  - cargo run
+  - cargo run --release
+
+branches:
+  only:
+    - master

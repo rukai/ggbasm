@@ -1,18 +1,11 @@
-#![feature(rust_2018_preview)]
-
 use failure::Error;
 
 use ggbasm::rom_builder::RomBuilder;
 use ggbasm::header::{Header, ColorSupport, CartridgeType, RamType};
 
 fn main() {
-    if let Err(error) = run() {
-        println!("{}", error);
-        println!("{}", error.backtrace());
-    }
-    else {
-        println!("Compiled project to ferris.gb");
-    }
+    run().unwrap(); // unwrap so that CI will fail on an error
+    println!("Compiled project to ferris.gb");
 }
 
 fn run() -> Result<(), Error> {

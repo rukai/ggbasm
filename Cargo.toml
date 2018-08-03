@@ -5,6 +5,11 @@ name = "ggbasm"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 edition = '2018'
+license = "MIT"
+description = "Generating Gameboy Assembler"
+repository = "https://github.com/rukai/ggbasm"
+keywords = ["gameboy", "assembly", "assembler", "asm", "gb"]
+categories = ["game-engines"]
 
 [dependencies]
 nom = "4"
