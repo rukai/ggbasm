@@ -109,7 +109,7 @@ impl RomBuilder {
             address: self.address,
             source:  DataSource::Code,
         });
-        self.address = 0x149;
+        self.address = 0x150;
 
         Ok(self)
     }
@@ -147,7 +147,10 @@ impl RomBuilder {
         let mut text = String::new();
         file.read_to_string(&mut text)?;
 
-        let instructions = parser::parse_asm(text)?;
+        let instructions = match parser::parse_asm(&text) {
+            Ok(instructions) => instructions,
+            Err(err) => bail!("Cannot parse file {} because: {}", file_name, err),
+        };
         let len: usize = instructions.iter().map(|x| x.bytes().len()).sum();
 
         self.data.push(DataHolder {
@@ -289,8 +292,10 @@ impl RomBuilder {
                 Data::Binary { bytes, .. } => {
                     rom.extend(bytes);
                 }
-                Data::Instructions (_) => {
-                    // TODO
+                Data::Instructions (instructions) => {
+                    for instruction in instructions {
+                        rom.extend(instruction.bytes());
+                    }
                 }
             }
 
@@ -307,6 +312,9 @@ impl RomBuilder {
         // verify cartridge_type and rom_size_factor are compatible
         let cartridge_type = CartridgeType::variant(rom[0x0147]);
         let final_size_factor = rom[0x0148];
+        if final_size_factor >= 0x20 {
+            bail!("rom size factor (0x0148) is too big, needs to be less than 32 was {}", final_size_factor);
+        }
         let final_size = (ROM_BANK_SIZE * 2) << final_size_factor;
         match cartridge_type {
             CartridgeType::RomOnly | CartridgeType::RomRam | CartridgeType::RomRamBattery => {

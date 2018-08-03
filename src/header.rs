@@ -173,6 +173,7 @@ impl Header {
         rom.push(self.version_number);
         rom.push(0x00); // Header checksum TODO
         rom.push(0x00); // Global checksum
+        rom.push(0x00); // Global checksum
     }
 }
 
