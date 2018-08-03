@@ -11,18 +11,18 @@ fn main() {
         println!("{}", error.backtrace());
     }
     else {
-        println!("Compiled project to empty.gb");
+        println!("Compiled project to ferris.gb");
     }
 }
 
 fn run() -> Result<(), Error> {
     let header = Header {
-        title:          String::from("Empty"),
+        title:          String::from("Ferris"),
         color_support:  ColorSupport::Unsupported,
         licence:        String::new(),
         sgb_support:    false,
-        cartridge_type: CartridgeType::RomOnly,
-        ram_type:       RamType::None,
+        cartridge_type: CartridgeType::Mbc5Ram,
+        ram_type:       RamType::Some32KB,
         japanese:       false,
         version_number: 0,
     };
@@ -30,6 +30,7 @@ fn run() -> Result<(), Error> {
     RomBuilder::new()?
         .add_basic_interrupts_and_jumps()?
         .add_header(header)?
-        .write_to_disk("empty.gb")?;
+        .add_asm_file("main.asm")?
+        .write_to_disk("ferris.gb")?;
     Ok(())
 }

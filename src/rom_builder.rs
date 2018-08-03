@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::fs;
 use std::io::{Read, Write};
-use std::path::{PathBuf, Path};
+use std::path::{PathBuf};
 
 use failure::Error;
 use failure::bail;
@@ -11,11 +10,12 @@ use failure::bail;
 use crate::header::{Header, CartridgeType};
 use crate::instruction::Instruction;
 use crate::constants::*;
+use crate::parser;
 
 pub enum Data {
     Instructions (Vec<Instruction>),
-    Binary       (Vec<u8>),
-    Header (Header),
+    Binary       { bytes: Vec<u8>, identifier: String },
+    Header       (Header),
     DummyInterruptsAndJumps,
 }
 
@@ -23,8 +23,8 @@ impl Data {
     pub fn len(&self) -> usize {
         match self {
             Data::Instructions (instructions) => instructions.iter().map(|x| x.bytes().len()).sum(),
-            Data::Binary (bytes)              => bytes.len(),
-            Data::Header (_)                  => 0x45,
+            Data::Binary       { bytes, .. }  => bytes.len(),
+            Data::Header       (_)            => 0x45,
             Data::DummyInterruptsAndJumps     => 0x104,
         }
     }
@@ -37,6 +37,7 @@ pub enum DataSource {
 
 pub struct DataHolder {
     data:    Data,
+    #[allow(dead_code)]
     source:  DataSource,
     address: u32,
 }
@@ -49,25 +50,27 @@ pub struct DataHolder {
 /// The offsets specified by a section instruction will cause the space between to be skipped.
 /// Because the builder can not go backwards, this means the space in between is now unusable.
 pub struct RomBuilder {
-    data:    Vec<DataHolder>,
-    address: u32,
+    data:     Vec<DataHolder>,
+    address:  u32,
+    root_dir: PathBuf,
 }
 
 impl RomBuilder {
     /// Creates a RomBuilder.
-    pub fn new() -> RomBuilder {
-        RomBuilder {
-            data:    vec!(),
-            address: 0,
-        }
+    pub fn new() -> Result<RomBuilder, Error> {
+        Ok(RomBuilder {
+            data:     vec!(),
+            address:  0,
+            root_dir: RomBuilder::root_dir()?,
+        })
     }
 
-    /// Adds dummy intterupt and jump data from 0x0000 to 0x0103.
+    /// Adds basic interrupt and jump data from 0x0000 to 0x0103.
     /// The entry point jumps to 0x0150.
     /// The interrupts return immediately.
     /// The RST commands jump to the entry point.
     /// Returns an error if the RomBuilder address is not at 0x0000.
-    pub fn add_dummy_interrupts_and_jumps(mut self) -> Result<Self, Error> {
+    pub fn add_basic_interrupts_and_jumps(mut self) -> Result<Self, Error> {
         if self.address != 0x0000 {
             bail!("Attempted to add header data when address != 0x0000");
         }
@@ -111,18 +114,55 @@ impl RomBuilder {
         Ok(self)
     }
 
-    /// Includes binary data in the rom.
+    /// Includes raw bytes in the rom.
     /// The name is used to reference the address in assembly code.
     /// Returns an error if crosses rom bank boundaries
-    pub fn add_binary_data(mut self, data: Vec<u8>, name: &str) -> Result<Self, Error> {
-        Ok(self)
+    pub fn add_bytes(mut self, bytes: Vec<u8>, identifier: &str) -> Result<Self, Error> {
+        let len = bytes.len() as u32;
+        let identifier = String::from(identifier);
+        self.data.push(DataHolder {
+            data:    Data::Binary { bytes, identifier },
+            address: self.address,
+            source:  DataSource::Code,
+        });
+
+        let prev_bank = self.get_bank();
+        self.address += len as u32;
+        if prev_bank == self.get_bank() {
+            Ok(self)
+        } else {
+            bail!("The added instructions cross bank boundaries.");
+        }
     }
 
     /// This function is used to include a *.asm file from the gbasm folder.
     /// Returns an error if crosses rom bank boundaries.
     /// Returns an error if encounters file system issues.
     pub fn add_asm_file(mut self, file_name: &str) -> Result<Self, Error> {
-        Ok(self)
+        let path = self.root_dir.as_path().join("gbasm").join(file_name);
+        let mut file = match File::open(path) {
+            Ok(file) => file,
+            Err(err) => bail!("Cannot read file {} because: {}", file_name, err),
+        };
+        let mut text = String::new();
+        file.read_to_string(&mut text)?;
+
+        let instructions = parser::parse_asm(text)?;
+        let len: usize = instructions.iter().map(|x| x.bytes().len()).sum();
+
+        self.data.push(DataHolder {
+            data:    Data::Instructions(instructions),
+            address: self.address,
+            source:  DataSource::File(file_name.to_string()),
+        });
+
+        let prev_bank = self.get_bank();
+        self.address += len as u32;
+        if prev_bank == self.get_bank() {
+            Ok(self)
+        } else {
+            bail!("The added instructions cross bank boundaries.");
+        }
     }
 
     /// This function is used to include instructions in the rom.
@@ -135,16 +175,22 @@ impl RomBuilder {
             source:  DataSource::Code,
         });
 
+        let prev_bank = self.get_bank();
         self.address += len as u32;
-        Ok(self)
+        if prev_bank == self.get_bank() {
+            Ok(self)
+        } else {
+            bail!("The added instructions cross bank boundaries.");
+        }
     }
 
     /// Sets the current address and bank as specified.
     /// Returns an error if attempts to go backwards.
+    /// To cross bank boundaries you need to use this function.
     pub fn advance_address(mut self, address: u32, rom_bank: u32) -> Result<Self, Error> {
         let new_address = address + rom_bank * ROM_BANK_SIZE;
         if new_address >= self.address {
-            bail!("Attempted to advance to a previous address")
+            bail!("Attempted to advance to a previous address.")
         } else {
             self.address = new_address;
             Ok(self)
@@ -161,7 +207,7 @@ impl RomBuilder {
         self.address % ROM_BANK_SIZE
     }
 
-    /// Gets the current address within the current bank
+    /// Gets the current bank
     pub fn get_bank(&self) -> u32 {
         self.address / ROM_BANK_SIZE
     }
@@ -231,7 +277,7 @@ impl RomBuilder {
                         rom.push(0x00);
                     }
 
-                    // jump to 0x0150 because why not
+                    // jump to 0x0150
                     rom.push(0x00);
                     rom.push(0xc3);
                     rom.push(0x01);
@@ -240,8 +286,8 @@ impl RomBuilder {
                 Data::Header (header) => {
                     header.write(&mut rom, rom_size_factor as u8);
                 }
-                Data::Binary (_) => {
-                    // TODO
+                Data::Binary { bytes, .. } => {
+                    rom.extend(bytes);
                 }
                 Data::Instructions (_) => {
                     // TODO
@@ -317,5 +363,35 @@ impl RomBuilder {
         }
 
         Ok(rom)
+    }
+
+    /// Compile the rom then write it to disk at the root of the project.
+    /// The root of the project is the outermost directory containing a Cargo.toml file.
+    pub fn write_to_disk(self, name: &str) -> Result<(), Error> {
+        let output = self.root_dir.as_path().join(name);
+        let rom = self.compile()?;
+        File::create(&output)?.write(&rom)?;
+        Ok(())
+    }
+
+    /// Iteratively search for the innermost Cargo.toml starting at the current
+    /// working directory and working up through its parents.
+    /// Returns the path to the directory the Cargo.toml is in.
+    /// Or an error if the file couldn't be found.
+    fn root_dir() -> Result<PathBuf, Error> {
+        let current_dir = env::current_dir()?;
+        let mut current = current_dir.as_path();
+
+        loop {
+            let toml = current.join("Cargo.toml");
+            if fs::metadata(&toml).is_ok() {
+                return Ok(toml.parent().unwrap().to_path_buf())
+            }
+
+            match current.parent() {
+                Some(p) => current = p,
+                None => bail!("Cant find a Cargo.toml in any of the parent directories")
+            }
+        }
     }
 }

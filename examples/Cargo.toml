@@ -1,6 +1,8 @@
 [workspace]
 members = [
-    "empty"
+    "empty",
+    "asm_header",
+    "ferris"
 ]
 
 [profile.release]

@@ -1,7 +1,7 @@
 cargo-features = ["edition"]
 
 [package]
-name = "custom_header"
+name = "asm_header"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 edition = '2018'
