@@ -1,3 +1,4 @@
+use byteorder::{ByteOrder, LittleEndian};
 use failure::Error;
 use failure::bail;
 use nom::*;
@@ -6,36 +7,132 @@ use nom::types::CompleteStr;
 use crate::instruction::Instruction;
 
 static IDENTIFIER: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_-";
+static HEX:        &str = "1234567890ABCDEFabcdef";
+static DEC:        &str = "1234567890";
 static WHITESPACE: &str = " \t";
+
+fn is_hex(input: char) -> bool {
+    HEX.contains(input)
+}
+
+fn is_dec(input: char) -> bool {
+    DEC.contains(input)
+}
+
+fn from_dec_u8(input: CompleteStr) -> u8 {
+    u8::from_str_radix(input.as_ref(), 10).unwrap()
+}
+
+fn from_hex_u8(input: CompleteStr) -> u8 {
+    u8::from_str_radix(input.as_ref(), 16).unwrap()
+}
+
+named!(parse_u8<CompleteStr, u8>,
+    alt!(
+        // hexadecimal
+        do_parse!(
+            tag!("0x") >>
+            value: map!(
+                take_while_m_n!(1, 2, is_hex),
+                from_hex_u8
+            ) >>
+            (value)
+        ) |
+        // decimal
+        map!(
+            take_while_m_n!(1, 3, is_dec),
+            from_dec_u8
+        )
+    )
+);
+
+fn from_dec_u16(input: CompleteStr) -> [u8; 2] {
+    let value = u16::from_str_radix(input.as_ref(), 10).unwrap();
+    let mut result: [u8; 2] = [0, 0];
+    LittleEndian::write_u16(&mut result, value);
+    result
+}
+
+fn from_hex_u16(input: CompleteStr) -> [u8; 2] {
+    let value = u16::from_str_radix(input.as_ref(), 16).unwrap();
+    let mut result: [u8; 2] = [0, 0];
+    LittleEndian::write_u16(&mut result, value);
+    result
+}
+
+named!(parse_u16<CompleteStr, [u8; 2]>,
+    alt!(
+        // hexadecimal
+        do_parse!(
+            tag!("0x") >>
+            value: map!(
+                take_while_m_n!(1, 4, is_hex),
+                from_hex_u16
+            ) >>
+            (value)
+        ) |
+        // decimal
+        map!(
+            take_while_m_n!(1, 5, is_dec),
+            from_dec_u16
+        )
+    )
+);
+
+named!(instruction<CompleteStr, Instruction >,
+    alt!(
+        // label
+        do_parse!(
+            label: is_a!(IDENTIFIER) >>
+            tag!(":") >>
+            (Instruction::Label (label.to_string()))
+        ) |
+
+        // direct bytes
+        do_parse!(
+            tag_no_case!("db") >>
+            is_a!(WHITESPACE) >>
+            value: separated_nonempty_list!(
+                is_a!(WHITESPACE),
+                parse_u8
+            ) >>
+            (Instruction::Db (value))
+        ) |
+
+        // direct words
+        do_parse!(
+            tag_no_case!("dw") >>
+            is_a!(WHITESPACE) >>
+            value: parse_u16 >>
+            (Instruction::Db (value.to_vec()))
+        ) |
+
+        // instructions
+        value!(Instruction::Stop,  tag_no_case!("stop")) |
+        value!(Instruction::Nop,   tag_no_case!("nop")) |
+        value!(Instruction::Halt,  tag_no_case!("halt")) |
+        value!(Instruction::Di,    tag_no_case!("di")) |
+        value!(Instruction::Ei,    tag_no_case!("ei")) |
+
+        // line containing only whitespace/empty
+        value!(Instruction::EmptyLine, is_a!(WHITESPACE)) |
+
+        // Gracefully handle unimplemented instructions TODO: make this an error
+        value!(Instruction::EmptyLine, not_line_ending)
+    )
+);
 
 named!(instructions<CompleteStr, Vec<Instruction> >,
     many0!(
         terminated!(
             do_parse!(
+                // an instruction can be surrounded by whitespace
                 opt!(is_a!(WHITESPACE)) >>
-                instruction: alt!(
-                    // label
-                    do_parse!(
-                        label: is_a!(IDENTIFIER) >>
-                        tag!(":") >>
-                        (Instruction::Label (label.to_string()))
-                    ) |
+                instruction: instruction >>
+                opt!(is_a!(WHITESPACE)) >>
 
-                    // instructions
-                    value!(Instruction::Stop,  tag_no_case!("stop")) |
-                    value!(Instruction::Nop,   tag_no_case!("nop")) |
-                    value!(Instruction::Halt,  tag_no_case!("halt")) |
-                    value!(Instruction::Di,    tag_no_case!("di")) |
-                    value!(Instruction::Ei,    tag_no_case!("ei")) |
-
-                    // line containing only whitespace/empty
-                    value!(Instruction::EmptyLine, is_a!(WHITESPACE)) |
-
-                    // Gracefully handle unimplemented instructions TODO: make this an error
-                    value!(Instruction::EmptyLine, not_line_ending)
-                ) >>
+                // ignore comments
                 opt!(do_parse!(
-                    opt!(is_a!(WHITESPACE)) >>
                     is_a!(";") >>
                     is_not!("\r\n") >>
                     (0)
@@ -48,8 +145,7 @@ named!(instructions<CompleteStr, Vec<Instruction> >,
 );
 
 pub fn parse_asm(text: &str) -> Result<Vec<Instruction>, Error> {
-    // Ensure a trailing \n is included
-    // TODO: Avoid this copy, should be able to handle this in the parser combinator
+    // Ensure a trailing \n is included TODO: Avoid this copy, should be able to handle this in the parser combinator
     let mut text = String::from(text);
     if text.chars().last().map(|x| x != '\n').unwrap_or(false) {
         text.push('\n');

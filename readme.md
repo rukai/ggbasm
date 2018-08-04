@@ -43,4 +43,8 @@ I assume other assemblers are similar.
 *   rgbasm needs to run `rgbasm -o main.obj src/main.asm; rgblink -m game.map -n game.sym -o out.gb main.obj; rgbfix -p 0 -v out.gb` to build the rom, while ggbasm uses `cargo run` to build the rom
 *   rgbasm uses includes inside the *.asm files, while ggbasm uses rust to insert instructions and raw bytes at the correct location in the rom.
 *   ggbasm has helper functions for generating bytes such as: png_to_gb_sprite
-*   rgbasm has its own variant of intel syntax, while ggbasm uses actual intel syntax
+*   rgbasm has its own intel-like syntax, while ggbasm uses a different intel-like syntax. Changes from rgbasm are:
+    +   hexadecimal is represented as 0x2a instead of $2a
+    +   uses `advance_address 0xYYYY` instead of `section "FOO",$HOME[$YY]`
+    +   no commas between arguments: `ld a b` instead of `ld a, b`
+    +   the load high instruction from rgbasm `ld [$FF00 + $YY], a` is automatically used when doing `ld [0xFFYY] a`

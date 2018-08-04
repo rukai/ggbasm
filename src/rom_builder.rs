@@ -306,14 +306,14 @@ impl RomBuilder {
         }
 
         if rom.len() < 0x14F {
-            bail!("ROM is too small, header is not finished.");
+            bail!("ROM is too small, header is not finished. ROM was only {} bytes", rom.len());
         }
 
         // verify cartridge_type and rom_size_factor are compatible
         let cartridge_type = CartridgeType::variant(rom[0x0147]);
         let final_size_factor = rom[0x0148];
         if final_size_factor >= 0x20 {
-            bail!("rom size factor (0x0148) is too big, needs to be less than 32 was {}", final_size_factor);
+            bail!("ROM size factor (0x0148) is too big, needs to be less than 32 was {}", final_size_factor);
         }
         let final_size = (ROM_BANK_SIZE * 2) << final_size_factor;
         match cartridge_type {
