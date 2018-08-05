@@ -1,12 +1,12 @@
-use byteorder::{LittleEndian, WriteBytesExt};
+use byteorder::{LittleEndian, ByteOrder, WriteBytesExt};
 use failure::Error;
 use failure::bail;
 use nom::*;
 use nom::types::CompleteStr;
 
-use crate::instruction::Instruction;
+use crate::instruction::{Instruction, ExprU16};
 
-static IDENTIFIER: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_-";
+static IDENT: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_-";
 static HEX:        &str = "1234567890ABCDEFabcdef";
 static DEC:        &str = "1234567890";
 static WHITESPACE: &str = " \t";
@@ -51,11 +51,30 @@ named!(parse_u16<CompleteStr, u16>,
     )
 );
 
-fn u16_to_db(input: u16) -> Instruction {
+fn u16_to_vec(input: u16) -> Vec<u8> {
     let mut result = vec!();
     result.write_u16::<LittleEndian>(input).unwrap();
-    Instruction::Db(result)
+    result
 }
+
+fn u16_to_array(input: u16) -> [u8; 2] {
+    let mut result = [0, 0];
+    LittleEndian::write_u16(&mut result, input);
+    result
+}
+
+named!(parse_expr_u16<CompleteStr, ExprU16 >,
+    alt!(
+        do_parse!(
+            value: parse_u16 >>
+            (ExprU16::U16(u16_to_array(value)))
+        ) |
+        do_parse!(
+            ident: is_a!(IDENT) >>
+            (ExprU16::Ident(ident.to_string()))
+        )
+    )
+);
 
 named!(parse_string<CompleteStr, Vec<u8> >,
     delimited!(
@@ -72,7 +91,7 @@ named!(instruction<CompleteStr, Instruction >,
     alt!(
         // label
         do_parse!(
-            label: is_a!(IDENTIFIER) >>
+            label: is_a!(IDENT) >>
             tag!(":") >>
             end_line >>
             (Instruction::Label (label.to_string()))
@@ -97,15 +116,12 @@ named!(instruction<CompleteStr, Instruction >,
         ) |
 
         // direct words
-        map!(
-            do_parse!(
-                tag_no_case!("dw") >>
-                is_a!(WHITESPACE) >>
-                value: parse_u16 >>
-                end_line >>
-                (value)
-            ),
-            u16_to_db
+        do_parse!(
+            tag_no_case!("dw") >>
+            is_a!(WHITESPACE) >>
+            value: parse_u16 >>
+            end_line >>
+            (Instruction::Db(u16_to_vec(value)))
         ) |
 
         // advance address
@@ -118,13 +134,20 @@ named!(instruction<CompleteStr, Instruction >,
         ) |
 
         // instructions
-        terminated!(value!(Instruction::Stop,  tag_no_case!("stop")), end_line) |
-        terminated!(value!(Instruction::Nop,   tag_no_case!("nop")),  end_line) |
-        terminated!(value!(Instruction::Halt,  tag_no_case!("halt")), end_line) |
-        terminated!(value!(Instruction::Di,    tag_no_case!("di")),   end_line) |
-        terminated!(value!(Instruction::Ei,    tag_no_case!("ei")),   end_line) |
-        terminated!(value!(Instruction::Ret,   tag_no_case!("ret")),  end_line) |
-        terminated!(value!(Instruction::Reti,  tag_no_case!("reti")), end_line) |
+        terminated!(value!(Instruction::Stop, tag_no_case!("stop")), end_line) |
+        terminated!(value!(Instruction::Nop,  tag_no_case!("nop")),  end_line) |
+        terminated!(value!(Instruction::Halt, tag_no_case!("halt")), end_line) |
+        terminated!(value!(Instruction::Di,   tag_no_case!("di")),   end_line) |
+        terminated!(value!(Instruction::Ei,   tag_no_case!("ei")),   end_line) |
+        terminated!(value!(Instruction::Ret,  tag_no_case!("ret")),  end_line) |
+        terminated!(value!(Instruction::Reti, tag_no_case!("reti")), end_line) |
+        do_parse!(
+            tag_no_case!("jp") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr_u16 >>
+            end_line >>
+            (Instruction::Jp (expr))
+        ) |
 
         // line containing only whitespace/empty
         value!(Instruction::EmptyLine, end_line)

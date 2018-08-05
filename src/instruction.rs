@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+use failure::Error;
+use failure::bail;
+use byteorder::{LittleEndian, ByteOrder};
+
 use crate::constants::*;
 
 #[derive(PartialEq, Debug)]
@@ -11,7 +15,25 @@ pub enum ExprU8 {
 #[derive(PartialEq, Debug)]
 pub enum ExprU16 {
     Ident (String),
-    U16 (u8),
+    U16 ([u8; 2]),
+}
+
+impl ExprU16 {
+    pub fn get_bytes(&self, ident_to_address: &HashMap<String, u32>) -> Result<[u8; 2], Error> {
+        match self {
+            ExprU16::Ident (ident) => {
+                match ident_to_address.get(ident) {
+                    Some(address) => {
+                        let mut result = [0, 0];
+                        LittleEndian::write_u16(&mut result, *address as u16);
+                        Ok(result)
+                    }
+                    None => bail!("Identifier {} can not be found", ident)
+                }
+            }
+            ExprU16::U16 (bytes) => Ok(bytes.clone())
+        }
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -29,10 +51,11 @@ pub enum Instruction {
     Ei,
     Ret,
     Reti,
+    Jp (ExprU16),
 }
 
 impl Instruction {
-    pub fn write_to_rom(&self, rom: &mut Vec<u8>, ident_to_address: &HashMap<String, u32>) {
+    pub fn write_to_rom(&self, rom: &mut Vec<u8>, ident_to_address: &HashMap<String, u32>) -> Result<(), Error> {
         match self {
             Instruction::AdvanceAddress (advance_address) => {
                 let address_bank = (rom.len() as u32 % ROM_BANK_SIZE) as u16;
@@ -51,7 +74,12 @@ impl Instruction {
             Instruction::Ei         => rom.push(0xFB),
             Instruction::Ret        => rom.push(0xC9),
             Instruction::Reti       => rom.push(0xD9),
+            Instruction::Jp (expr) => {
+                rom.push(0xC3);
+                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+            }
         }
+        Ok(())
     }
 
     pub fn len(&self, start_address: u16) -> u16 {
@@ -67,6 +95,7 @@ impl Instruction {
             Instruction::Ei         => 1,
             Instruction::Ret        => 1,
             Instruction::Reti       => 1,
+            Instruction::Jp (_)     => 3,
         }
     }
 }

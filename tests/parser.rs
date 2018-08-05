@@ -1,5 +1,5 @@
 use ggbasm::parser::parse_asm;
-use ggbasm::instruction::Instruction;
+use ggbasm::instruction::{Instruction, ExprU16};
 
 #[test]
 fn test_empty() {
@@ -261,5 +261,20 @@ a b c d
         None,
         Some(Instruction::Nop),
         None,
+    ]);
+}
+
+#[test]
+fn test_jp() {
+    let text = r#"
+    jp 0x150
+    jp foo_bar
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
+    &[
+        Instruction::EmptyLine,
+        Instruction::Jp (ExprU16::U16 ([0x50, 0x01])),
+        Instruction::Jp (ExprU16::Ident (String::from("foo_bar"))),
     ]);
 }

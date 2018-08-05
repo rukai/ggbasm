@@ -14,7 +14,7 @@ script:
   - cd asm_header
   - cargo run
   - cargo run --release
-  - cd ../empty
+  - cd ../rust_only
   - cargo run
   - cargo run --release
   - cd ../ferris
