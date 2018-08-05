@@ -129,7 +129,7 @@ fn test_simple_instructions() {
 }
 
 #[test]
-fn test_db_dw() {
+fn test_db() {
     let text = r#"
     db 0
     db 255
@@ -143,17 +143,10 @@ fn test_db_dw() {
     db 0 1
     db 0 0 1 2 3 4
     db 0 0x1 2 0x3 5 0x4
-
-    dw 0
-    dw 413
-    dw 65535
-    dw 0x0
-    dw 0xE
-    dw 0x13
-    dw 0x413
-    dw 0x0000
-    dw 0xFFFF
-    dw 0x1337
+    db "a"
+    db "Hello World!"
+    db "hi" 0x13 37
+    db 4 13 "hammers"
 "#;
     assert_eq!(parse_asm(text).unwrap().as_slice(),
     &[
@@ -170,6 +163,29 @@ fn test_db_dw() {
         Instruction::Db (vec!(0, 1)),
         Instruction::Db (vec!(0, 0, 1, 2, 3, 4)),
         Instruction::Db (vec!(0, 1, 2, 3, 5, 4)),
+        Instruction::Db (vec!(0x61)),
+        Instruction::Db (vec!(0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64, 0x21)),
+        Instruction::Db (vec!(0x68, 0x69, 0x13, 37)),
+        Instruction::Db (vec!(4, 13, 0x68, 0x61, 0x6d, 0x6d, 0x65, 0x72, 0x73)),
+    ]);
+}
+
+#[test]
+fn test_dw() {
+    let text = r#"
+    dw 0
+    dw 413
+    dw 65535
+    dw 0x0
+    dw 0xE
+    dw 0x13
+    dw 0x413
+    dw 0x0000
+    dw 0xFFFF
+    dw 0x1337
+"#;
+    assert_eq!(parse_asm(text).unwrap().as_slice(),
+    &[
         Instruction::EmptyLine,
         Instruction::Db (vec!(0x00, 0x00)),
         Instruction::Db (vec!(0x9d, 0x01)),

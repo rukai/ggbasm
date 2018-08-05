@@ -19,56 +19,34 @@ fn is_dec(input: char) -> bool {
     DEC.contains(input)
 }
 
-fn from_dec_u8(input: CompleteStr) -> u8 {
-    u8::from_str_radix(input.as_ref(), 10).unwrap()
-}
-
-fn from_hex_u8(input: CompleteStr) -> u8 {
-    u8::from_str_radix(input.as_ref(), 16).unwrap()
-}
-
 named!(parse_u8<CompleteStr, u8>,
     alt!(
         // hexadecimal
         do_parse!(
             tag!("0x") >>
-            value: map!(
-                take_while_m_n!(1, 2, is_hex),
-                from_hex_u8
-            ) >>
-            (value)
+            value: take_while_m_n!(1, 2, is_hex) >>
+            (u8::from_str_radix(value.as_ref(), 16).unwrap())
         ) |
         // decimal
-        map!(
-            take_while_m_n!(1, 3, is_dec),
-            from_dec_u8
+        do_parse!(
+            value: take_while_m_n!(1, 3, is_dec) >>
+            (u8::from_str_radix(value.as_ref(), 10).unwrap())
         )
     )
 );
-
-fn from_dec_u16(input: CompleteStr) -> u16 {
-    u16::from_str_radix(input.as_ref(), 10).unwrap()
-}
-
-fn from_hex_u16(input: CompleteStr) -> u16 {
-    u16::from_str_radix(input.as_ref(), 16).unwrap()
-}
 
 named!(parse_u16<CompleteStr, u16>,
     alt!(
         // hexadecimal
         do_parse!(
             tag!("0x") >>
-            value: map!(
-                take_while_m_n!(1, 4, is_hex),
-                from_hex_u16
-            ) >>
-            (value)
+            value: take_while_m_n!(1, 4, is_hex) >>
+            (u16::from_str_radix(value.as_ref(), 16).unwrap())
         ) |
         // decimal
-        map!(
-            take_while_m_n!(1, 5, is_dec),
-            from_dec_u16
+        do_parse!(
+            value: take_while_m_n!(1, 5, is_dec) >>
+            (u16::from_str_radix(value.as_ref(), 10).unwrap())
         )
     )
 );
@@ -78,6 +56,17 @@ fn u16_to_db(input: u16) -> Instruction {
     result.write_u16::<LittleEndian>(input).unwrap();
     Instruction::Db(result)
 }
+
+named!(parse_string<CompleteStr, Vec<u8> >,
+    delimited!(
+        tag!("\""),
+        do_parse!(
+            value: is_not!("\r\n\"") >>
+            (value.as_bytes().to_vec())
+        ),
+        tag!("\"")
+    )
+);
 
 named!(instruction<CompleteStr, Instruction >,
     alt!(
@@ -94,9 +83,15 @@ named!(instruction<CompleteStr, Instruction >,
             is_a!(WHITESPACE) >>
             value: separated_nonempty_list!(
                 is_a!(WHITESPACE),
-                parse_u8
+                alt!(
+                    parse_string |
+                    do_parse!(
+                        value: parse_u8 >>
+                        (vec!(value))
+                    )
+                )
             ) >>
-            (Instruction::Db (value))
+            (Instruction::Db (value.iter().flatten().cloned().collect()))
         ) |
 
         // direct words
