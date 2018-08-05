@@ -74,6 +74,7 @@ named!(instruction<CompleteStr, Instruction >,
         do_parse!(
             label: is_a!(IDENTIFIER) >>
             tag!(":") >>
+            end_line >>
             (Instruction::Label (label.to_string()))
         ) |
 
@@ -91,6 +92,7 @@ named!(instruction<CompleteStr, Instruction >,
                     )
                 )
             ) >>
+            end_line >>
             (Instruction::Db (value.iter().flatten().cloned().collect()))
         ) |
 
@@ -100,6 +102,7 @@ named!(instruction<CompleteStr, Instruction >,
                 tag_no_case!("dw") >>
                 is_a!(WHITESPACE) >>
                 value: parse_u16 >>
+                end_line >>
                 (value)
             ),
             u16_to_db
@@ -110,46 +113,62 @@ named!(instruction<CompleteStr, Instruction >,
             tag_no_case!("advance_address") >>
             is_a!(WHITESPACE) >>
             value: parse_u16 >>
+            end_line >>
             (Instruction::AdvanceAddress (value))
         ) |
 
         // instructions
-        value!(Instruction::Stop,  tag_no_case!("stop")) |
-        value!(Instruction::Nop,   tag_no_case!("nop")) |
-        value!(Instruction::Halt,  tag_no_case!("halt")) |
-        value!(Instruction::Di,    tag_no_case!("di")) |
-        value!(Instruction::Ei,    tag_no_case!("ei")) |
-        value!(Instruction::Reti,  tag_no_case!("reti")) |
-        value!(Instruction::Ret,   tag_no_case!("ret")) |
+        terminated!(value!(Instruction::Stop,  tag_no_case!("stop")), end_line) |
+        terminated!(value!(Instruction::Nop,   tag_no_case!("nop")),  end_line) |
+        terminated!(value!(Instruction::Halt,  tag_no_case!("halt")), end_line) |
+        terminated!(value!(Instruction::Di,    tag_no_case!("di")),   end_line) |
+        terminated!(value!(Instruction::Ei,    tag_no_case!("ei")),   end_line) |
+        terminated!(value!(Instruction::Ret,   tag_no_case!("ret")),  end_line) |
+        terminated!(value!(Instruction::Reti,  tag_no_case!("reti")), end_line) |
 
         // line containing only whitespace/empty
-        value!(Instruction::EmptyLine, is_a!(WHITESPACE))
+        value!(Instruction::EmptyLine, end_line)
     )
 );
 
-named!(instructions<CompleteStr, Vec<Instruction> >,
+named!(end_line<CompleteStr, ()>,
+    do_parse!(
+        // ignore trailing whitespace
+        opt!(is_a!(WHITESPACE)) >>
+
+        // ignore comments
+        opt!(do_parse!(
+            is_a!(";") >>
+            opt!(is_not!("\r\n")) >>
+            (())
+        )) >>
+
+        // does the line truely end?
+        peek!(is_a!("\r\n")) >>
+        (())
+    )
+);
+
+named!(instructions<CompleteStr, Vec<Option<Instruction>> >,
     many0!(
         terminated!(
             do_parse!(
-                // an instruction can be surrounded by whitespace
-                opt!(is_a!(WHITESPACE)) >>
-                instruction: opt!(instruction) >>
+                // ignore preceding whitespace
                 opt!(is_a!(WHITESPACE)) >>
 
-                // ignore comments
-                opt!(do_parse!(
-                    is_a!(";") >>
-                    opt!(is_not!("\r\n")) >>
-                    (0)
-                )) >>
-                (instruction.unwrap_or(Instruction::EmptyLine)) // TODO: Can I do error handling at this point? maybe return an Option<Instruction> then let the RomBuilder construct an error message showing the line in the file where the issue occured.
+                // if an instruction fails to parse, it becomes a None and we handle the error later
+                instruction: opt!(instruction) >>
+
+                // If the instruction is None, then we need to clean up the unparsed line.
+                opt!(is_not!("\r\n")) >>
+                (instruction)
             ),
             line_ending
         )
     )
 );
 
-pub fn parse_asm(text: &str) -> Result<Vec<Instruction>, Error> {
+pub fn parse_asm(text: &str) -> Result<Vec<Option<Instruction>>, Error> {
     // Ensure a trailing \n is included TODO: Avoid this copy, should be able to handle this in the parser combinator
     let mut text = String::from(text);
     if text.chars().last().map(|x| x != '\n').unwrap_or(false) {

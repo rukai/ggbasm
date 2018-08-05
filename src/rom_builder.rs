@@ -146,7 +146,30 @@ impl RomBuilder {
             Ok(instructions) => instructions,
             Err(err) => bail!("Cannot parse file {} because: {}", file_name, err),
         };
-        self.add_instructions_inner(instructions, DataSource::File(file_name.to_string()))
+
+        let mut instructions2 = vec!();
+        for (i, instruction) in instructions.into_iter().enumerate() {
+            match instruction {
+                Some(instruction) => { println!("{:?}", instruction); instructions2.push(instruction) }
+                None => {
+                    // TODO: Return a proper BuildError enum instead of relying on failure::Error
+                    // TODO: Then I can have a pretty_print() method on it that displays something like:
+                    // ```
+                    // 103: halt   // color green
+                    // 104: nop    // color green
+                    // 105: foobar // color red
+                    // 106: nop    // color white
+                    // An error occured on line 105 of foo_file.asm // color red
+                    // ```
+                    //
+                    // TODO: Even better I could handle multiple errors in one message, I have the
+                    // information given from the parser already, I just need to handle it from RomBuilder.
+                    bail!("Invalid instruction on line {} of {}", i + 1, file_name)
+                }
+            }
+        }
+
+        self.add_instructions_inner(instructions2, DataSource::File(file_name.to_string()))
     }
 
     /// This function is used to include instructions in the rom.

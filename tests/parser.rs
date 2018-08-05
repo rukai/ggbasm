@@ -8,7 +8,8 @@ fn test_empty() {
 
 #[test]
 fn test_single_newline() {
-    assert_eq!(parse_asm("\n").unwrap().as_slice(),
+    let result: Vec<Instruction> = parse_asm("\n").unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine
     ]);
@@ -16,7 +17,8 @@ fn test_single_newline() {
 
 #[test]
 fn test_two_newline() {
-    assert_eq!(parse_asm("\n\n").unwrap().as_slice(),
+    let result: Vec<Instruction> = parse_asm("\n\n").unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
         Instruction::EmptyLine,
@@ -25,7 +27,8 @@ fn test_two_newline() {
 
 #[test]
 fn test_two_newline_and_space() {
-    assert_eq!(parse_asm("\n   \n").unwrap().as_slice(),
+    let result: Vec<Instruction> = parse_asm("\n   \n").unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
         Instruction::EmptyLine,
@@ -34,7 +37,8 @@ fn test_two_newline_and_space() {
 
 #[test]
 fn test_final_newline_missing() {
-    assert_eq!(parse_asm("nop\nnop\nnop").unwrap().as_slice(),
+    let result: Vec<Instruction> = parse_asm("nop\nnop\nnop").unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
     &[
         Instruction::Nop,
         Instruction::Nop,
@@ -44,7 +48,8 @@ fn test_final_newline_missing() {
 
 #[test]
 fn test_final_newline_included() {
-    assert_eq!(parse_asm("nop\nnop\nnop\n").unwrap().as_slice(),
+    let result: Vec<Instruction> = parse_asm("nop\nnop\nnop\n").unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
     &[
         Instruction::Nop,
         Instruction::Nop,
@@ -79,7 +84,8 @@ label2: ; some very important message
 stop    
 whitespace_following: 
 "#;
-    assert_eq!(parse_asm(text).unwrap().as_slice(),
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
     &[
         Instruction::Nop,
         Instruction::Label(String::from("label")),
@@ -119,7 +125,8 @@ fn test_simple_instructions() {
     ret
     reti
 "#;
-    assert_eq!(parse_asm(text).unwrap().as_slice(),
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
         Instruction::Nop,
@@ -152,7 +159,8 @@ fn test_db() {
     db "hi" 0x13 37
     db 4 13 "hammers"
 "#;
-    assert_eq!(parse_asm(text).unwrap().as_slice(),
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
         Instruction::Db (vec!(0)),
@@ -188,7 +196,8 @@ fn test_dw() {
     dw 0xFFFF
     dw 0x1337
 "#;
-    assert_eq!(parse_asm(text).unwrap().as_slice(),
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
         Instruction::Db (vec!(0x00, 0x00)),
@@ -213,7 +222,8 @@ fn test_advance_address() {
     advance_address 0x1337
     advance_address 0xFFFF
 "#;
-    assert_eq!(parse_asm(text).unwrap().as_slice(),
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
         Instruction::AdvanceAddress (0),
@@ -221,5 +231,35 @@ fn test_advance_address() {
         Instruction::AdvanceAddress (413),
         Instruction::AdvanceAddress (0x1337),
         Instruction::AdvanceAddress (0xFFFF),
+    ]);
+}
+
+#[test]
+fn test_invalid_instruction() {
+    let text = r#"
+    nop
+
+    foobar
+
+    nop
+    stop that
+    nop
+    stopthat
+    nop
+a b c d
+"#;
+    assert_eq!(parse_asm(text).unwrap().as_slice(),
+    &[
+        Some(Instruction::EmptyLine),
+        Some(Instruction::Nop),
+        Some(Instruction::EmptyLine),
+        None,
+        Some(Instruction::EmptyLine),
+        Some(Instruction::Nop),
+        None,
+        Some(Instruction::Nop),
+        None,
+        Some(Instruction::Nop),
+        None,
     ]);
 }
