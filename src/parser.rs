@@ -1,10 +1,10 @@
-use byteorder::{LittleEndian, ByteOrder, WriteBytesExt};
+use byteorder::{LittleEndian, WriteBytesExt};
 use failure::Error;
 use failure::bail;
 use nom::*;
 use nom::types::CompleteStr;
 
-use crate::instruction::{Instruction, ExprU16};
+use crate::instruction::{Instruction, ExprU16, Reg16};
 
 static IDENT: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_-";
 static HEX:        &str = "1234567890ABCDEFabcdef";
@@ -57,22 +57,25 @@ fn u16_to_vec(input: u16) -> Vec<u8> {
     result
 }
 
-fn u16_to_array(input: u16) -> [u8; 2] {
-    let mut result = [0, 0];
-    LittleEndian::write_u16(&mut result, input);
-    result
-}
-
 named!(parse_expr_u16<CompleteStr, ExprU16 >,
     alt!(
         do_parse!(
             value: parse_u16 >>
-            (ExprU16::U16(u16_to_array(value)))
+            (ExprU16::U16(value))
         ) |
         do_parse!(
             ident: is_a!(IDENT) >>
             (ExprU16::Ident(ident.to_string()))
         )
+    )
+);
+
+named!(parse_reg_u16<CompleteStr, Reg16 >,
+    alt!(
+        value!(Reg16::BC, tag_no_case!("bc")) |
+        value!(Reg16::DE, tag_no_case!("de")) |
+        value!(Reg16::HL, tag_no_case!("hl")) |
+        value!(Reg16::SP, tag_no_case!("sp"))
     )
 );
 
@@ -147,6 +150,15 @@ named!(instruction<CompleteStr, Instruction >,
             expr: parse_expr_u16 >>
             end_line >>
             (Instruction::Jp (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u16 >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr_u16 >>
+            end_line >>
+            (Instruction::LdReg16Immediate (reg, expr))
         ) |
 
         // line containing only whitespace/empty

@@ -1,5 +1,5 @@
 use ggbasm::parser::parse_asm;
-use ggbasm::instruction::{Instruction, ExprU16};
+use ggbasm::instruction::{Instruction, ExprU16, Reg16};
 
 #[test]
 fn test_empty() {
@@ -274,7 +274,28 @@ fn test_jp() {
     assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
-        Instruction::Jp (ExprU16::U16 ([0x50, 0x01])),
+        Instruction::Jp (ExprU16::U16 (0x0150)),
         Instruction::Jp (ExprU16::Ident (String::from("foo_bar"))),
+    ]);
+}
+
+#[test]
+fn test_ld() {
+    let text = r#"
+    ld BC 0x0413
+    ld BC something
+    ld DE 0x413
+    ld HL 0x413
+    ld SP 0x413
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
+    &[
+        Instruction::EmptyLine,
+        Instruction::LdReg16Immediate (Reg16::BC, ExprU16::U16 (0x0413)),
+        Instruction::LdReg16Immediate (Reg16::BC, ExprU16::Ident (String::from("something"))),
+        Instruction::LdReg16Immediate (Reg16::DE, ExprU16::U16 (0x0413)),
+        Instruction::LdReg16Immediate (Reg16::HL, ExprU16::U16 (0x0413)),
+        Instruction::LdReg16Immediate (Reg16::SP, ExprU16::U16 (0x0413)),
     ]);
 }

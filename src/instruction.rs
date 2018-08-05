@@ -15,31 +15,49 @@ pub enum ExprU8 {
 #[derive(PartialEq, Debug)]
 pub enum ExprU16 {
     Ident (String),
-    U16 ([u8; 2]),
+    U16 (u16),
 }
 
 impl ExprU16 {
     pub fn get_bytes(&self, ident_to_address: &HashMap<String, u32>) -> Result<[u8; 2], Error> {
-        match self {
+        let value = match self {
             ExprU16::Ident (ident) => {
                 match ident_to_address.get(ident) {
-                    Some(address) => {
-                        let mut result = [0, 0];
-                        LittleEndian::write_u16(&mut result, *address as u16);
-                        Ok(result)
-                    }
+                    Some(address) => (*address as u16),
                     None => bail!("Identifier {} can not be found", ident)
                 }
             }
-            ExprU16::U16 (bytes) => Ok(bytes.clone())
-        }
+            ExprU16::U16 (value) => *value,
+        };
+        let mut result = [0, 0];
+        LittleEndian::write_u16(&mut result, value);
+        Ok(result)
     }
+}
+
+#[derive(PartialEq, Debug)]
+pub enum Reg8 {
+    A,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum Reg16 {
+    BC,
+    DE,
+    HL,
+    SP,
 }
 
 #[derive(PartialEq, Debug)]
 pub enum Instruction {
     /// Keeping track of empty lines makes it easier to refer errors back to a line number
-    EmptyLine,
+    EmptyLine, // TODO: Combine this and the Option returned by the parser into a new enum
     /// the address within the current ROM bank
     AdvanceAddress (u16),
     Label (String),
@@ -51,6 +69,7 @@ pub enum Instruction {
     Ei,
     Ret,
     Reti,
+    LdReg16Immediate (Reg16, ExprU16),
     Jp (ExprU16),
 }
 
@@ -78,6 +97,15 @@ impl Instruction {
                 rom.push(0xC3);
                 rom.extend(expr.get_bytes(ident_to_address)?.iter());
             }
+            Instruction::LdReg16Immediate (register, expr) => {
+                match register {
+                    Reg16::BC => rom.push(0x01),
+                    Reg16::DE => rom.push(0x11),
+                    Reg16::HL => rom.push(0x21),
+                    Reg16::SP => rom.push(0x31),
+                }
+                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+            }
         }
         Ok(())
     }
@@ -96,6 +124,7 @@ impl Instruction {
             Instruction::Ret        => 1,
             Instruction::Reti       => 1,
             Instruction::Jp (_)     => 3,
+            Instruction::LdReg16Immediate (_, _) => 3
         }
     }
 }

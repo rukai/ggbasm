@@ -5,5 +5,5 @@ start:
     ; the advance_address instruction refers to a position within the bank of the *.asm file.
     advance_address 0x200
 the_real_start:
-    nop
+    ld hl 0x413
     jp the_real_start

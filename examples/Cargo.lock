@@ -3,7 +3,7 @@ name = "asm_header"
 version = "0.1.0"
 dependencies = [
  "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "ggbasm 0.1.0",
+ "ggbasm 0.1.1",
 ]
 
 [[package]]
@@ -67,12 +67,12 @@ name = "ferris"
 version = "0.1.0"
 dependencies = [
  "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "ggbasm 0.1.0",
+ "ggbasm 0.1.1",
 ]
 
 [[package]]
 name = "ggbasm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "byteorder 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -121,7 +121,7 @@ name = "rust_only"
 version = "0.1.0"
 dependencies = [
  "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "ggbasm 0.1.0",
+ "ggbasm 0.1.1",
 ]
 
 [[package]]
