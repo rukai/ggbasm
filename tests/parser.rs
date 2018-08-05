@@ -1,5 +1,5 @@
 use ggbasm::parser::parse_asm;
-use ggbasm::instruction::{Instruction, ExprU16, Reg16};
+use ggbasm::instruction::*;
 
 #[test]
 fn test_empty() {
@@ -297,5 +297,32 @@ fn test_ld() {
         Instruction::LdReg16Immediate (Reg16::DE, ExprU16::U16 (0x0413)),
         Instruction::LdReg16Immediate (Reg16::HL, ExprU16::U16 (0x0413)),
         Instruction::LdReg16Immediate (Reg16::SP, ExprU16::U16 (0x0413)),
+    ]);
+}
+
+#[test]
+fn test_push_pop() {
+    let text = r#"
+    push BC
+    push DE
+    push HL
+    push AF
+    pop BC
+    pop DE
+    pop HL
+    pop AF
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
+    &[
+        Instruction::EmptyLine,
+        Instruction::Push (Reg16Push::BC),
+        Instruction::Push (Reg16Push::DE),
+        Instruction::Push (Reg16Push::HL),
+        Instruction::Push (Reg16Push::AF),
+        Instruction::Pop  (Reg16Push::BC),
+        Instruction::Pop  (Reg16Push::DE),
+        Instruction::Pop  (Reg16Push::HL),
+        Instruction::Pop  (Reg16Push::AF),
     ]);
 }

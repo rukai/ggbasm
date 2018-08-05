@@ -4,7 +4,7 @@ use failure::bail;
 use nom::*;
 use nom::types::CompleteStr;
 
-use crate::instruction::{Instruction, ExprU16, Reg16};
+use crate::instruction::{Instruction, ExprU16, Reg16, Reg16Push};
 
 static IDENT: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_-";
 static HEX:        &str = "1234567890ABCDEFabcdef";
@@ -76,6 +76,15 @@ named!(parse_reg_u16<CompleteStr, Reg16 >,
         value!(Reg16::DE, tag_no_case!("de")) |
         value!(Reg16::HL, tag_no_case!("hl")) |
         value!(Reg16::SP, tag_no_case!("sp"))
+    )
+);
+
+named!(parse_reg_u16_push<CompleteStr, Reg16Push >,
+    alt!(
+        value!(Reg16Push::BC, tag_no_case!("bc")) |
+        value!(Reg16Push::DE, tag_no_case!("de")) |
+        value!(Reg16Push::HL, tag_no_case!("hl")) |
+        value!(Reg16Push::AF, tag_no_case!("af"))
     )
 );
 
@@ -159,6 +168,20 @@ named!(instruction<CompleteStr, Instruction >,
             expr: parse_expr_u16 >>
             end_line >>
             (Instruction::LdReg16Immediate (reg, expr))
+        ) |
+        do_parse!(
+            tag_no_case!("push") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u16_push >>
+            end_line >>
+            (Instruction::Push (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("pop") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u16_push >>
+            end_line >>
+            (Instruction::Pop (reg))
         ) |
 
         // line containing only whitespace/empty
