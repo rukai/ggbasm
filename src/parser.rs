@@ -1,4 +1,4 @@
-use byteorder::{ByteOrder, LittleEndian};
+use byteorder::{LittleEndian, WriteBytesExt};
 use failure::Error;
 use failure::bail;
 use nom::*;
@@ -46,21 +46,15 @@ named!(parse_u8<CompleteStr, u8>,
     )
 );
 
-fn from_dec_u16(input: CompleteStr) -> [u8; 2] {
-    let value = u16::from_str_radix(input.as_ref(), 10).unwrap();
-    let mut result: [u8; 2] = [0, 0];
-    LittleEndian::write_u16(&mut result, value);
-    result
+fn from_dec_u16(input: CompleteStr) -> u16 {
+    u16::from_str_radix(input.as_ref(), 10).unwrap()
 }
 
-fn from_hex_u16(input: CompleteStr) -> [u8; 2] {
-    let value = u16::from_str_radix(input.as_ref(), 16).unwrap();
-    let mut result: [u8; 2] = [0, 0];
-    LittleEndian::write_u16(&mut result, value);
-    result
+fn from_hex_u16(input: CompleteStr) -> u16 {
+    u16::from_str_radix(input.as_ref(), 16).unwrap()
 }
 
-named!(parse_u16<CompleteStr, [u8; 2]>,
+named!(parse_u16<CompleteStr, u16>,
     alt!(
         // hexadecimal
         do_parse!(
@@ -78,6 +72,12 @@ named!(parse_u16<CompleteStr, [u8; 2]>,
         )
     )
 );
+
+fn u16_to_db(input: u16) -> Instruction {
+    let mut result = vec!();
+    result.write_u16::<LittleEndian>(input).unwrap();
+    Instruction::Db(result)
+}
 
 named!(instruction<CompleteStr, Instruction >,
     alt!(
@@ -100,11 +100,22 @@ named!(instruction<CompleteStr, Instruction >,
         ) |
 
         // direct words
+        map!(
+            do_parse!(
+                tag_no_case!("dw") >>
+                is_a!(WHITESPACE) >>
+                value: parse_u16 >>
+                (value)
+            ),
+            u16_to_db
+        ) |
+
+        // advance address
         do_parse!(
-            tag_no_case!("dw") >>
+            tag_no_case!("advance_address") >>
             is_a!(WHITESPACE) >>
             value: parse_u16 >>
-            (Instruction::Db (value.to_vec()))
+            (Instruction::AdvanceAddress (value))
         ) |
 
         // instructions

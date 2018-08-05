@@ -34,17 +34,17 @@ RomBuilder::new()
     .write_to_disk("my_cool_game.gb")?;
 ```
 
-## Comparison with rgbasm
+## Comparison with [RGBDS](https://github.com/rednex/rgbds)
 
-rgbasm is the only other gameboy assembler i've used.
+RGBDS is the only other gameboy assembler i've used.
 I assume other assemblers are similar.
 
-*   rgbasm requires only *.asm files, while ggbasm requires *.asm, and an entire rust crate.
-*   rgbasm needs to run `rgbasm -o main.obj src/main.asm; rgblink -m game.map -n game.sym -o out.gb main.obj; rgbfix -p 0 -v out.gb` to build the rom, while ggbasm uses `cargo run` to build the rom
-*   rgbasm uses includes inside the *.asm files, while ggbasm uses rust to insert instructions and raw bytes at the correct location in the rom.
-*   ggbasm has helper functions for generating bytes such as: png_to_gb_sprite
-*   rgbasm has its own intel-like syntax, while ggbasm uses a different intel-like syntax. Changes from rgbasm are:
+*   RGBDS requires only *.asm files, while GGBASM requires *.asm, and an entire rust crate.
+*   RGBDS needs to run `RGBDS -o main.obj src/main.asm; rgblink -m game.map -n game.sym -o out.gb main.obj; rgbfix -p 0 -v out.gb` to build the rom, while GGBASM uses `cargo run` to build the rom
+*   RGBDS uses includes inside the *.asm files, while GGBASM uses rust to insert instructions and raw bytes at the correct location in the rom.
+*   GGBASM has helper functions for generating bytes such as: png_to_gb_sprite
+*   RGBDS has its own intel-like syntax, while GGBASM uses a different intel-like syntax. Changes from RGBDS are:
     +   hexadecimal is represented as 0x2a instead of $2a
     +   uses `advance_address 0xYYYY` instead of `section "FOO",$HOME[$YY]`
     +   no commas between arguments: `ld a b` instead of `ld a, b`
-    +   the load high instruction from rgbasm `ld [$FF00 + $YY], a` is automatically used when doing `ld [0xFFYY] a`
+    +   the load high instruction from RGBDS `ld [$FF00 + $YY], a` is automatically used when doing `ld [0xFFYY] a`

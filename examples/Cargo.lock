@@ -43,14 +43,6 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "empty"
-version = "0.1.0"
-dependencies = [
- "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "ggbasm 0.1.0",
-]
-
-[[package]]
 name = "failure"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -122,6 +114,14 @@ version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro2 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "rust_only"
+version = "0.1.0"
+dependencies = [
+ "failure 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ggbasm 0.1.0",
 ]
 
 [[package]]

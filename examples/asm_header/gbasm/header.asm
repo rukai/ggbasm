@@ -104,7 +104,7 @@ JOYPAD_VECT:
     DB 0x00
 
     ; 0x014D (Complement check)
-    DB 0x00 // TODO
+    DB 0x00 // TODO: You will have to do this manually.
 
     ; 0x014E-0x014F (Cartridge checksum)
     DW 0x00
@@ -115,9 +115,8 @@ JOYPAD_VECT:
 
     advance_address 0x150
 Start:
-    ; TODO: Init
+    ; TODO: Put your init code here
 
 Loop:
-    ; TODO: Game loop
-    halt
+    ; TODO: Put your game loop here
     jp Loop

@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "empty",
+    "rust_only",
     "asm_header",
     "ferris"
 ]

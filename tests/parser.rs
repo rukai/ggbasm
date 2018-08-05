@@ -183,3 +183,23 @@ fn test_db_dw() {
         Instruction::Db (vec!(0x37, 0x13)),
     ]);
 }
+
+#[test]
+fn test_advance_address() {
+    let text = r#"
+    advance_address 0
+    advance_address 0x0
+    advance_address 413
+    advance_address 0x1337
+    advance_address 0xFFFF
+"#;
+    assert_eq!(parse_asm(text).unwrap().as_slice(),
+    &[
+        Instruction::EmptyLine,
+        Instruction::AdvanceAddress (0),
+        Instruction::AdvanceAddress (0x0),
+        Instruction::AdvanceAddress (413),
+        Instruction::AdvanceAddress (0x1337),
+        Instruction::AdvanceAddress (0xFFFF),
+    ]);
+}

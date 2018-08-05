@@ -5,7 +5,7 @@ use ggbasm::header::{Header, ColorSupport, CartridgeType, RamType};
 
 fn main() {
     run().unwrap(); // unwrap so that CI will fail on an error
-    println!("Compiled project to empty.gb");
+    println!("Compiled project to rust_only.gb");
 }
 
 fn run() -> Result<(), Error> {
@@ -23,6 +23,6 @@ fn run() -> Result<(), Error> {
     RomBuilder::new()?
         .add_basic_interrupts_and_jumps()?
         .add_header(header)?
-        .write_to_disk("empty.gb")?;
+        .write_to_disk("rust_only.gb")?;
     Ok(())
 }

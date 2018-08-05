@@ -3,6 +3,7 @@ use std::fs::File;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{PathBuf};
+use std::collections::HashMap;
 
 use failure::Error;
 use failure::bail;
@@ -19,17 +20,6 @@ pub enum Data {
     DummyInterruptsAndJumps,
 }
 
-impl Data {
-    pub fn len(&self) -> usize {
-        match self {
-            Data::Instructions (instructions) => instructions.iter().map(|x| x.bytes().len()).sum(),
-            Data::Binary       { bytes, .. }  => bytes.len(),
-            Data::Header       (_)            => 0x45,
-            Data::DummyInterruptsAndJumps     => 0x104,
-        }
-    }
-}
-
 pub enum DataSource {
     File (String),
     Code /* TODO: Include stacktrace */
@@ -39,29 +29,33 @@ pub struct DataHolder {
     data:    Data,
     #[allow(dead_code)]
     source:  DataSource,
+    /// address within the entire rom
     address: u32,
 }
 
 /// Keeps track of the state of a rom as it is being constructed.
 /// Keeps track of the current address and inserts binary data and instructions at that address.
 /// The address is advanced when binary data or instructions are added and can also be manually advanced.
+/// When manually advanced the area in between is filled with zeroes.
 /// The address can only be advanced, it can never go backwards.
 ///
-/// The offsets specified by a section instruction will cause the space between to be skipped.
-/// Because the builder can not go backwards, this means the space in between is now unusable.
+/// In *.asm files, the advance_address instruction will cause the space between the last instruction 
+/// and the new address to be filled with zeroes.
 pub struct RomBuilder {
-    data:     Vec<DataHolder>,
-    address:  u32,
-    root_dir: PathBuf,
+    data:             Vec<DataHolder>,
+    address:          u32,
+    root_dir:         PathBuf,
+    ident_to_address: HashMap<String, u32>,
 }
 
 impl RomBuilder {
     /// Creates a RomBuilder.
     pub fn new() -> Result<RomBuilder, Error> {
         Ok(RomBuilder {
-            data:     vec!(),
-            address:  0,
-            root_dir: RomBuilder::root_dir()?,
+            data:             vec!(),
+            address:          0,
+            root_dir:         RomBuilder::root_dir()?,
+            ident_to_address: HashMap::new(),
         })
     }
 
@@ -120,6 +114,7 @@ impl RomBuilder {
     pub fn add_bytes(mut self, bytes: Vec<u8>, identifier: &str) -> Result<Self, Error> {
         let len = bytes.len() as u32;
         let identifier = String::from(identifier);
+        self.ident_to_address.insert(identifier.to_string(), self.address);
         self.data.push(DataHolder {
             data:    Data::Binary { bytes, identifier },
             address: self.address,
@@ -138,7 +133,7 @@ impl RomBuilder {
     /// This function is used to include a *.asm file from the gbasm folder.
     /// Returns an error if crosses rom bank boundaries.
     /// Returns an error if encounters file system issues.
-    pub fn add_asm_file(mut self, file_name: &str) -> Result<Self, Error> {
+    pub fn add_asm_file(self, file_name: &str) -> Result<Self, Error> {
         let path = self.root_dir.as_path().join("gbasm").join(file_name);
         let mut file = match File::open(path) {
             Ok(file) => file,
@@ -151,35 +146,34 @@ impl RomBuilder {
             Ok(instructions) => instructions,
             Err(err) => bail!("Cannot parse file {} because: {}", file_name, err),
         };
-        let len: usize = instructions.iter().map(|x| x.bytes().len()).sum();
-
-        self.data.push(DataHolder {
-            data:    Data::Instructions(instructions),
-            address: self.address,
-            source:  DataSource::File(file_name.to_string()),
-        });
-
-        let prev_bank = self.get_bank();
-        self.address += len as u32;
-        if prev_bank == self.get_bank() {
-            Ok(self)
-        } else {
-            bail!("The added instructions cross bank boundaries.");
-        }
+        self.add_instructions_inner(instructions, DataSource::File(file_name.to_string()))
     }
 
     /// This function is used to include instructions in the rom.
     /// Returns an error if crosses rom bank boundaries.
-    pub fn add_instructions(mut self, instructions: Vec<Instruction>) -> Result<Self, Error> {
-        let len: usize = instructions.iter().map(|x| x.bytes().len()).sum();
+    pub fn add_instructions(self, instructions: Vec<Instruction>) -> Result<Self, Error> {
+        self.add_instructions_inner(instructions, DataSource::Code)
+    }
+
+    fn add_instructions_inner(mut self, instructions: Vec<Instruction>, source: DataSource) -> Result<Self, Error> {
+        let mut cur_address = self.address;
+        for instruction in &instructions {
+            if let Instruction::Label (label) = instruction {
+                self.ident_to_address.insert(label.to_string(), cur_address);
+            }
+            else {
+                cur_address += instruction.len((cur_address % ROM_BANK_SIZE) as u16) as u32;
+            }
+        }
+
         self.data.push(DataHolder {
             data:    Data::Instructions(instructions),
             address: self.address,
-            source:  DataSource::Code,
+            source,
         });
 
         let prev_bank = self.get_bank();
-        self.address += len as u32;
+        self.address += cur_address as u32;
         if prev_bank == self.get_bank() {
             Ok(self)
         } else {
@@ -206,8 +200,8 @@ impl RomBuilder {
     }
 
     /// Gets the current address within the current bank
-    pub fn get_address_bank(&self) -> u32 {
-        self.address % ROM_BANK_SIZE
+    pub fn get_address_bank(&self) -> u16 {
+        (self.address % ROM_BANK_SIZE) as u16
     }
 
     /// Gets the current bank
@@ -217,37 +211,37 @@ impl RomBuilder {
 
     /// Compiles assembly and binary data into binary rom data
     pub fn compile(self) -> Result<Vec<u8>, Error> {
-        let mut rom = vec!();
-
-        let rom_size_factor = if let Some(data) = self.data.last() {
-            let size = data.address + data.data.len() as u32;
-            if size <= ROM_BANK_SIZE * 2 {
-                0
-            } else if size <= ROM_BANK_SIZE * 4 {
-                1
-            } else if size <= ROM_BANK_SIZE * 8 {
-                2
-            } else if size <= ROM_BANK_SIZE * 16 {
-                3
-            } else if size <= ROM_BANK_SIZE * 32 {
-                4
-            } else if size <= ROM_BANK_SIZE * 64 {
-                5
-            } else if size <= ROM_BANK_SIZE * 128 {
-                6
-            } else if size <= ROM_BANK_SIZE * 256 {
-                7
-            } else if size <= ROM_BANK_SIZE * 512 {
-                8
-            } else {
-                bail!("ROM is too big, there is no MBC that supports a ROM size larger than 8MB, raw ROM size was {}", size);
-            }
-        } else {
+        if self.data.last().is_none() {
             bail!("No instructions or binary data was added to the RomBuilder");
+        }
+
+        let rom_size_factor = if self.address <= ROM_BANK_SIZE * 2 {
+            0
+        } else if self.address <= ROM_BANK_SIZE * 4 {
+            1
+        } else if self.address <= ROM_BANK_SIZE * 8 {
+            2
+        } else if self.address <= ROM_BANK_SIZE * 16 {
+            3
+        } else if self.address <= ROM_BANK_SIZE * 32 {
+            4
+        } else if self.address <= ROM_BANK_SIZE * 64 {
+            5
+        } else if self.address <= ROM_BANK_SIZE * 128 {
+            6
+        } else if self.address <= ROM_BANK_SIZE * 256 {
+            7
+        } else if self.address <= ROM_BANK_SIZE * 512 {
+            8
+        } else {
+            bail!("ROM is too big, there is no MBC that supports a ROM size larger than 8MB, raw ROM size was {}", self.address);
         };
 
-        for data in self.data {
-            match data.data {
+        let mut rom = vec!();
+
+        // generate rom
+        for data in &self.data {
+            match &data.data {
                 Data::DummyInterruptsAndJumps => {
                     // jumps
                     for _ in 0..8 {
@@ -294,7 +288,7 @@ impl RomBuilder {
                 }
                 Data::Instructions (instructions) => {
                     for instruction in instructions {
-                        rom.extend(instruction.bytes());
+                        instruction.write_to_rom(&mut rom, &self.ident_to_address);
                     }
                 }
             }
