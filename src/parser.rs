@@ -119,12 +119,11 @@ named!(instruction<CompleteStr, Instruction >,
         value!(Instruction::Halt,  tag_no_case!("halt")) |
         value!(Instruction::Di,    tag_no_case!("di")) |
         value!(Instruction::Ei,    tag_no_case!("ei")) |
+        value!(Instruction::Reti,  tag_no_case!("reti")) |
+        value!(Instruction::Ret,   tag_no_case!("ret")) |
 
         // line containing only whitespace/empty
-        value!(Instruction::EmptyLine, is_a!(WHITESPACE)) |
-
-        // Gracefully handle unimplemented instructions TODO: make this an error
-        value!(Instruction::EmptyLine, not_line_ending)
+        value!(Instruction::EmptyLine, is_a!(WHITESPACE))
     )
 );
 
@@ -134,16 +133,16 @@ named!(instructions<CompleteStr, Vec<Instruction> >,
             do_parse!(
                 // an instruction can be surrounded by whitespace
                 opt!(is_a!(WHITESPACE)) >>
-                instruction: instruction >>
+                instruction: opt!(instruction) >>
                 opt!(is_a!(WHITESPACE)) >>
 
                 // ignore comments
                 opt!(do_parse!(
                     is_a!(";") >>
-                    is_not!("\r\n") >>
+                    opt!(is_not!("\r\n")) >>
                     (0)
                 )) >>
-                (instruction)
+                (instruction.unwrap_or(Instruction::EmptyLine)) // TODO: Can I do error handling at this point? maybe return an Option<Instruction> then let the RomBuilder construct an error message showing the line in the file where the issue occured.
             ),
             line_ending
         )

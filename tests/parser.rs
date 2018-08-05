@@ -116,6 +116,8 @@ fn test_simple_instructions() {
     halt
     di
     ei
+    ret
+    reti
 "#;
     assert_eq!(parse_asm(text).unwrap().as_slice(),
     &[
@@ -125,6 +127,8 @@ fn test_simple_instructions() {
         Instruction::Halt,
         Instruction::Di,
         Instruction::Ei,
+        Instruction::Ret,
+        Instruction::Reti,
     ]);
 }
 

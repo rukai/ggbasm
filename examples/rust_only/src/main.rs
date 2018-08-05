@@ -10,7 +10,7 @@ fn main() {
 
 fn run() -> Result<(), Error> {
     let header = Header {
-        title:          String::from("Empty"),
+        title:          String::from("Rust Only"),
         color_support:  ColorSupport::Unsupported,
         licence:        String::new(),
         sgb_support:    false,

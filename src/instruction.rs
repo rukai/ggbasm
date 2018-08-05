@@ -27,6 +27,8 @@ pub enum Instruction {
     Halt,
     Di,
     Ei,
+    Ret,
+    Reti,
 }
 
 impl Instruction {
@@ -47,6 +49,8 @@ impl Instruction {
             Instruction::Halt       => rom.push(0x76),
             Instruction::Di         => rom.push(0xF3),
             Instruction::Ei         => rom.push(0xFB),
+            Instruction::Ret        => rom.push(0xC9),
+            Instruction::Reti       => rom.push(0xD9),
         }
     }
 
@@ -61,6 +65,8 @@ impl Instruction {
             Instruction::Halt       => 1,
             Instruction::Di         => 1,
             Instruction::Ei         => 1,
+            Instruction::Ret        => 1,
+            Instruction::Reti       => 1,
         }
     }
 }
