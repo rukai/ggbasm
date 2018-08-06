@@ -77,10 +77,16 @@ pub enum Instruction {
     Ei,
     Ret,
     Reti,
+    IncR16 (Reg16),
+    IncR8  (Reg8),
+    IncM8,
+    DecR16 (Reg16),
+    DecR8  (Reg8),
+    DecM8,
     LdReg16Immediate (Reg16, ExprU16),
-    Jp (ExprU16),
-    Push (Reg16Push),
-    Pop (Reg16Push),
+    Jp    (ExprU16),
+    Push  (Reg16Push),
+    Pop   (Reg16Push),
 }
 
 impl Instruction {
@@ -107,6 +113,46 @@ impl Instruction {
                 rom.push(0xC3);
                 rom.extend(expr.get_bytes(ident_to_address)?.iter());
             }
+            Instruction::IncR16 (reg) => {
+                match reg {
+                    Reg16::BC => rom.push(0x03),
+                    Reg16::DE => rom.push(0x13),
+                    Reg16::HL => rom.push(0x23),
+                    Reg16::SP => rom.push(0x33),
+                }
+            }
+            Instruction::IncR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0x3C),
+                    Reg8::B => rom.push(0x04),
+                    Reg8::C => rom.push(0x0C),
+                    Reg8::D => rom.push(0x14),
+                    Reg8::E => rom.push(0x1C),
+                    Reg8::H => rom.push(0x24),
+                    Reg8::L => rom.push(0x2C),
+                }
+            }
+            Instruction::IncM8 => rom.push(0x034),
+            Instruction::DecR16 (reg) => {
+                match reg {
+                    Reg16::BC => rom.push(0x0B),
+                    Reg16::DE => rom.push(0x1B),
+                    Reg16::HL => rom.push(0x2B),
+                    Reg16::SP => rom.push(0x3B),
+                }
+            }
+            Instruction::DecR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0x3D),
+                    Reg8::B => rom.push(0x05),
+                    Reg8::C => rom.push(0x0D),
+                    Reg8::D => rom.push(0x15),
+                    Reg8::E => rom.push(0x1D),
+                    Reg8::H => rom.push(0x25),
+                    Reg8::L => rom.push(0x2D),
+                }
+            }
+            Instruction::DecM8 => rom.push(0x035),
             Instruction::LdReg16Immediate (reg, expr) => {
                 match reg {
                     Reg16::BC => rom.push(0x01),
@@ -150,6 +196,12 @@ impl Instruction {
             Instruction::Ret        => 1,
             Instruction::Reti       => 1,
             Instruction::Jp (_)     => 3,
+            Instruction::IncR16 (_) => 1,
+            Instruction::IncR8 (_)  => 1,
+            Instruction::IncM8      => 1,
+            Instruction::DecR16 (_) => 1,
+            Instruction::DecR8 (_)  => 1,
+            Instruction::DecM8      => 1,
             Instruction::LdReg16Immediate (_, _) => 3,
             Instruction::Push (_) => 1,
             Instruction::Pop  (_) => 1,

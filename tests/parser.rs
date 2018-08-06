@@ -280,6 +280,65 @@ fn test_jp() {
 }
 
 #[test]
+fn test_inc_dec() {
+    let text = r#"
+    inc BC
+    inc DE
+    inc HL
+    inc SP
+    inc A
+    inc B
+    inc C
+    inc D
+    inc E
+    inc H
+    inc L
+    inc [hl]
+    dec BC
+    dec DE
+    dec HL
+    dec SP
+    dec A
+    dec B
+    dec C
+    dec D
+    dec E
+    dec H
+    dec L
+    dec [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
+    &[
+        Instruction::EmptyLine,
+        Instruction::IncR16 (Reg16::BC),
+        Instruction::IncR16 (Reg16::DE),
+        Instruction::IncR16 (Reg16::HL),
+        Instruction::IncR16 (Reg16::SP),
+        Instruction::IncR8  (Reg8::A),
+        Instruction::IncR8  (Reg8::B),
+        Instruction::IncR8  (Reg8::C),
+        Instruction::IncR8  (Reg8::D),
+        Instruction::IncR8  (Reg8::E),
+        Instruction::IncR8  (Reg8::H),
+        Instruction::IncR8  (Reg8::L),
+        Instruction::IncM8,
+        Instruction::DecR16 (Reg16::BC),
+        Instruction::DecR16 (Reg16::DE),
+        Instruction::DecR16 (Reg16::HL),
+        Instruction::DecR16 (Reg16::SP),
+        Instruction::DecR8  (Reg8::A),
+        Instruction::DecR8  (Reg8::B),
+        Instruction::DecR8  (Reg8::C),
+        Instruction::DecR8  (Reg8::D),
+        Instruction::DecR8  (Reg8::E),
+        Instruction::DecR8  (Reg8::H),
+        Instruction::DecR8  (Reg8::L),
+        Instruction::DecM8,
+    ]);
+}
+
+#[test]
 fn test_ld() {
     let text = r#"
     ld BC 0x0413

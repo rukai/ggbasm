@@ -4,7 +4,7 @@ use failure::bail;
 use nom::*;
 use nom::types::CompleteStr;
 
-use crate::instruction::{Instruction, ExprU16, Reg16, Reg16Push};
+use crate::instruction::*;
 
 static IDENT: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_-";
 static HEX:        &str = "1234567890ABCDEFabcdef";
@@ -57,7 +57,7 @@ fn u16_to_vec(input: u16) -> Vec<u8> {
     result
 }
 
-named!(parse_expr_u16<CompleteStr, ExprU16 >,
+named!(parse_expr_u16<CompleteStr, ExprU16>,
     alt!(
         do_parse!(
             value: parse_u16 >>
@@ -70,7 +70,19 @@ named!(parse_expr_u16<CompleteStr, ExprU16 >,
     )
 );
 
-named!(parse_reg_u16<CompleteStr, Reg16 >,
+named!(parse_reg_u8<CompleteStr, Reg8>,
+    alt!(
+        value!(Reg8::A, tag_no_case!("a")) |
+        value!(Reg8::B, tag_no_case!("b")) |
+        value!(Reg8::C, tag_no_case!("c")) |
+        value!(Reg8::D, tag_no_case!("d")) |
+        value!(Reg8::E, tag_no_case!("e")) |
+        value!(Reg8::H, tag_no_case!("h")) |
+        value!(Reg8::L, tag_no_case!("l"))
+    )
+);
+
+named!(parse_reg_u16<CompleteStr, Reg16>,
     alt!(
         value!(Reg16::BC, tag_no_case!("bc")) |
         value!(Reg16::DE, tag_no_case!("de")) |
@@ -79,7 +91,7 @@ named!(parse_reg_u16<CompleteStr, Reg16 >,
     )
 );
 
-named!(parse_reg_u16_push<CompleteStr, Reg16Push >,
+named!(parse_reg_u16_push<CompleteStr, Reg16Push>,
     alt!(
         value!(Reg16Push::BC, tag_no_case!("bc")) |
         value!(Reg16Push::DE, tag_no_case!("de")) |
@@ -99,7 +111,7 @@ named!(parse_string<CompleteStr, Vec<u8> >,
     )
 );
 
-named!(instruction<CompleteStr, Instruction >,
+named!(instruction<CompleteStr, Instruction>,
     alt!(
         // label
         do_parse!(
@@ -159,6 +171,28 @@ named!(instruction<CompleteStr, Instruction >,
             expr: parse_expr_u16 >>
             end_line >>
             (Instruction::Jp (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("inc") >>
+            is_a!(WHITESPACE) >>
+            reg: alt!(
+                do_parse!(reg: parse_reg_u16 >> (Instruction::IncR16 (reg))) |
+                do_parse!(reg: parse_reg_u8  >> (Instruction::IncR8  (reg))) |
+                value!(Instruction::IncM8, tag_no_case!("[hl]"))
+            ) >>
+            end_line >>
+            (reg)
+        ) |
+        do_parse!(
+            tag_no_case!("dec") >>
+            is_a!(WHITESPACE) >>
+            reg: alt!(
+                do_parse!(reg: parse_reg_u16 >> (Instruction::DecR16 (reg))) |
+                do_parse!(reg: parse_reg_u8  >> (Instruction::DecR8  (reg))) |
+                value!(Instruction::DecM8, tag_no_case!("[hl]"))
+            ) >>
+            end_line >>
+            (reg)
         ) |
         do_parse!(
             tag_no_case!("ld") >>
