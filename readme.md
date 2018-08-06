@@ -27,7 +27,7 @@ RomBuilder::new()
     .add_asm_file("main.asm")?
 
     // Add an image to the second rom bank
-    .advance_address(0, 1)?
+    .advance_address(1, 0)?
     .add_bytes(image)?;
 
     // Consume the RomBuilder and write the rom to disk

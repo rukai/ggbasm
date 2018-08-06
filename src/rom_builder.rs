@@ -196,7 +196,7 @@ impl RomBuilder {
         });
 
         let prev_bank = self.get_bank();
-        self.address += cur_address as u32;
+        self.address = cur_address as u32;
         if prev_bank == self.get_bank() {
             Ok(self)
         } else {
@@ -207,13 +207,13 @@ impl RomBuilder {
     /// Sets the current address and bank as specified.
     /// Returns an error if attempts to go backwards.
     /// To cross bank boundaries you need to use this function.
-    pub fn advance_address(mut self, address: u32, rom_bank: u32) -> Result<Self, Error> {
+    pub fn advance_address(mut self, rom_bank: u32, address: u32) -> Result<Self, Error> {
         let new_address = address + rom_bank * ROM_BANK_SIZE;
         if new_address >= self.address {
-            bail!("Attempted to advance to a previous address.")
-        } else {
             self.address = new_address;
             Ok(self)
+        } else {
+            bail!("Attempted to advance to a previous address.")
         }
     }
 
@@ -264,6 +264,11 @@ impl RomBuilder {
 
         // generate rom
         for data in &self.data {
+            // pad to address
+            for _ in 0..data.address as i32 - rom.len() as i32 {
+                rom.push(0x00);
+            }
+
             match &data.data {
                 Data::DummyInterruptsAndJumps => {
                     // jumps
@@ -320,11 +325,6 @@ impl RomBuilder {
                         }
                     }
                 }
-            }
-
-            // pad to address
-            for _ in 0..data.address as i32 - rom.len() as i32 {
-                rom.push(0x00);
             }
         }
 
