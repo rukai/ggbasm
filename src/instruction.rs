@@ -63,6 +63,14 @@ pub enum Reg16Push {
 }
 
 #[derive(PartialEq, Debug)]
+pub enum Flag {
+    Z,
+    NZ,
+    C,
+    NC
+}
+
+#[derive(PartialEq, Debug)]
 pub enum Instruction {
     /// Keeping track of empty lines makes it easier to refer errors back to a line number
     EmptyLine, // TODO: Combine this and the Option returned by the parser into a new enum
@@ -75,8 +83,11 @@ pub enum Instruction {
     Halt,
     Di,
     Ei,
+    RetFlag (Flag),
     Ret,
     Reti,
+    Call (ExprU16),
+    CallFlag (Flag, ExprU16),
     IncR16 (Reg16),
     IncR8  (Reg8),
     IncM8,
@@ -109,6 +120,27 @@ impl Instruction {
             Instruction::Ei         => rom.push(0xFB),
             Instruction::Ret        => rom.push(0xC9),
             Instruction::Reti       => rom.push(0xD9),
+            Instruction::RetFlag (flag)  => {
+                match flag {
+                    Flag::Z  => rom.push(0xC8),
+                    Flag::C  => rom.push(0xC9),
+                    Flag::NZ => rom.push(0xC0),
+                    Flag::NC => rom.push(0xD0),
+                }
+            }
+            Instruction::Call (expr)  => {
+                rom.push(0xCD);
+                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+            }
+            Instruction::CallFlag (flag, expr)  => {
+                match flag {
+                    Flag::Z  => rom.push(0xCC),
+                    Flag::C  => rom.push(0xDC),
+                    Flag::NZ => rom.push(0xC4),
+                    Flag::NC => rom.push(0xD4),
+                }
+                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+            }
             Instruction::Jp (expr) => {
                 rom.push(0xC3);
                 rom.extend(expr.get_bytes(ident_to_address)?.iter());
@@ -185,23 +217,26 @@ impl Instruction {
     pub fn len(&self, start_address: u16) -> u16 {
         match self {
             Instruction::AdvanceAddress (advance_address) => advance_address - start_address,
-            Instruction::EmptyLine  => 0,
-            Instruction::Label (_)  => 0,
-            Instruction::Db (bytes) => bytes.len() as u16,
-            Instruction::Nop        => 1,
-            Instruction::Stop       => 1,
-            Instruction::Halt       => 1,
-            Instruction::Di         => 1,
-            Instruction::Ei         => 1,
-            Instruction::Ret        => 1,
-            Instruction::Reti       => 1,
-            Instruction::Jp (_)     => 3,
-            Instruction::IncR16 (_) => 1,
-            Instruction::IncR8 (_)  => 1,
-            Instruction::IncM8      => 1,
-            Instruction::DecR16 (_) => 1,
-            Instruction::DecR8 (_)  => 1,
-            Instruction::DecM8      => 1,
+            Instruction::EmptyLine      => 0,
+            Instruction::Label (_)      => 0,
+            Instruction::Db (bytes)     => bytes.len() as u16,
+            Instruction::Nop            => 1,
+            Instruction::Stop           => 1,
+            Instruction::Halt           => 1,
+            Instruction::Di             => 1,
+            Instruction::Ei             => 1,
+            Instruction::RetFlag (_)    => 1,
+            Instruction::Ret            => 1,
+            Instruction::Reti           => 1,
+            Instruction::Call (_)       => 3,
+            Instruction::CallFlag (_,_) => 3,
+            Instruction::Jp (_)         => 3,
+            Instruction::IncR16 (_)     => 1,
+            Instruction::IncR8 (_)      => 1,
+            Instruction::IncM8          => 1,
+            Instruction::DecR16 (_)     => 1,
+            Instruction::DecR8 (_)      => 1,
+            Instruction::DecM8          => 1,
             Instruction::LdReg16Immediate (_, _) => 3,
             Instruction::Push (_) => 1,
             Instruction::Pop  (_) => 1,

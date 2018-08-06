@@ -100,6 +100,15 @@ named!(parse_reg_u16_push<CompleteStr, Reg16Push>,
     )
 );
 
+named!(parse_flag<CompleteStr, Flag>,
+    alt!(
+        value!(Flag::Z,  tag_no_case!("z")) |
+        value!(Flag::NZ, tag_no_case!("nz")) |
+        value!(Flag::C,  tag_no_case!("c")) |
+        value!(Flag::NC, tag_no_case!("nc"))
+    )
+);
+
 named!(parse_string<CompleteStr, Vec<u8> >,
     delimited!(
         tag!("\""),
@@ -165,6 +174,29 @@ named!(instruction<CompleteStr, Instruction>,
         terminated!(value!(Instruction::Ei,   tag_no_case!("ei")),   end_line) |
         terminated!(value!(Instruction::Ret,  tag_no_case!("ret")),  end_line) |
         terminated!(value!(Instruction::Reti, tag_no_case!("reti")), end_line) |
+        do_parse!(
+            tag_no_case!("ret") >>
+            is_a!(WHITESPACE) >>
+            flag: parse_flag >>
+            end_line >>
+            (Instruction::RetFlag (flag))
+        ) |
+        do_parse!(
+            tag_no_case!("call") >>
+            is_a!(WHITESPACE) >>
+            flag: parse_flag >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr_u16 >>
+            end_line >>
+            (Instruction::CallFlag (flag, expr))
+        ) |
+        do_parse!(
+            tag_no_case!("call") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr_u16 >>
+            end_line >>
+            (Instruction::Call (expr))
+        ) |
         do_parse!(
             tag_no_case!("jp") >>
             is_a!(WHITESPACE) >>

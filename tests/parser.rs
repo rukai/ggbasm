@@ -122,8 +122,6 @@ fn test_simple_instructions() {
     halt
     di
     ei
-    ret
-    reti
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result.as_slice(),
@@ -134,8 +132,50 @@ fn test_simple_instructions() {
         Instruction::Halt,
         Instruction::Di,
         Instruction::Ei,
+    ]);
+}
+
+#[test]
+fn test_ret() {
+    let text = r#"
+    ret Z
+    ret NZ
+    ret C
+    ret NC
+    ret
+    reti
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
+    &[
+        Instruction::EmptyLine,
+        Instruction::RetFlag (Flag::Z),
+        Instruction::RetFlag (Flag::NZ),
+        Instruction::RetFlag (Flag::C),
+        Instruction::RetFlag (Flag::NC),
         Instruction::Ret,
         Instruction::Reti,
+    ]);
+}
+
+#[test]
+fn test_call() {
+    let text = r#"
+    call Z foobar
+    call NZ 0x1337
+    call C 0
+    call NC 42
+    call 413
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
+    &[
+        Instruction::EmptyLine,
+        Instruction::CallFlag (Flag::Z, ExprU16::Ident(String::from("foobar"))),
+        Instruction::CallFlag (Flag::NZ, ExprU16::U16(0x1337)),
+        Instruction::CallFlag (Flag::C, ExprU16::U16(0)),
+        Instruction::CallFlag (Flag::NC, ExprU16::U16(42)),
+        Instruction::Call (ExprU16::U16(413)),
     ]);
 }
 
