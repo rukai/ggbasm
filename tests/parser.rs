@@ -149,11 +149,11 @@ fn test_ret() {
     assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
-        Instruction::RetFlag (Flag::Z),
-        Instruction::RetFlag (Flag::NZ),
-        Instruction::RetFlag (Flag::C),
-        Instruction::RetFlag (Flag::NC),
-        Instruction::Ret,
+        Instruction::Ret (Flag::Z),
+        Instruction::Ret (Flag::NZ),
+        Instruction::Ret (Flag::C),
+        Instruction::Ret (Flag::NC),
+        Instruction::Ret (Flag::Always),
         Instruction::Reti,
     ]);
 }
@@ -171,11 +171,11 @@ fn test_call() {
     assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
-        Instruction::CallFlag (Flag::Z, Expr16::Ident(String::from("foobar"))),
-        Instruction::CallFlag (Flag::NZ, Expr16::U16(0x1337)),
-        Instruction::CallFlag (Flag::C, Expr16::U16(0)),
-        Instruction::CallFlag (Flag::NC, Expr16::U16(42)),
-        Instruction::Call (Expr16::U16(413)),
+        Instruction::Call (Flag::Z, Expr16::Ident(String::from("foobar"))),
+        Instruction::Call (Flag::NZ, Expr16::U16(0x1337)),
+        Instruction::Call (Flag::C, Expr16::U16(0)),
+        Instruction::Call (Flag::NC, Expr16::U16(42)),
+        Instruction::Call (Flag::Always, Expr16::U16(413)),
     ]);
 }
 
@@ -318,12 +318,33 @@ fn test_jp() {
     assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
-        Instruction::JpI16 (Expr16::U16 (0x0150)),
-        Instruction::JpFlagI16 (Flag::NZ, Expr16::Ident (String::from("foo_bar"))),
-        Instruction::JpFlagI16 (Flag::Z, Expr16::U16 (413)),
-        Instruction::JpFlagI16 (Flag::NC, Expr16::U16 (1111)),
-        Instruction::JpFlagI16 (Flag::C, Expr16::U16 (42)),
+        Instruction::JpI16 (Flag::Always, Expr16::U16 (0x0150)),
+        Instruction::JpI16 (Flag::NZ,     Expr16::Ident (String::from("foo_bar"))),
+        Instruction::JpI16 (Flag::Z,      Expr16::U16 (413)),
+        Instruction::JpI16 (Flag::NC,     Expr16::U16 (1111)),
+        Instruction::JpI16 (Flag::C,      Expr16::U16 (42)),
         Instruction::JpHL,
+    ]);
+}
+
+#[test]
+fn test_jr() {
+    let text = r#"
+    jr 0x42
+    jr nz foo_bar
+    jr z 255
+    jr nc 11
+    jr c 42
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result.as_slice(),
+    &[
+        Instruction::EmptyLine,
+        Instruction::Jr (Flag::Always, Expr8::U8 (0x42)),
+        Instruction::Jr (Flag::NZ,     Expr8::Ident (String::from("foo_bar"))),
+        Instruction::Jr (Flag::Z,      Expr8::U8 (255)),
+        Instruction::Jr (Flag::NC,     Expr8::U8 (11)),
+        Instruction::Jr (Flag::C,      Expr8::U8 (42)),
     ]);
 }
 

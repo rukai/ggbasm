@@ -12,6 +12,25 @@ pub enum Expr8 {
     U8 (u8),
 }
 
+impl Expr8 {
+    pub fn get_byte(&self, ident_to_address: &HashMap<String, u32>) -> Result<u8, Error> {
+        match self {
+            Expr8::Ident (ident) => {
+                match ident_to_address.get(ident) {
+                    Some(address) => {
+                        if *address >= 0xFF {
+                            bail!("Identifier {} contains 0x{:x} but expected 8 bit value")
+                        }
+                        Ok(*address as u8)
+                    }
+                    None => bail!("Identifier {} can not be found", ident)
+                }
+            }
+            Expr8::U8 (value) => Ok(*value),
+        }
+    }
+}
+
 #[derive(PartialEq, Debug)]
 pub enum Expr16 {
     Ident (String),
@@ -23,7 +42,12 @@ impl Expr16 {
         let value = match self {
             Expr16::Ident (ident) => {
                 match ident_to_address.get(ident) {
-                    Some(address) => (*address as u16),
+                    Some(address) => {
+                        if *address >= 0xFFFF {
+                            bail!("Identifier {} contains 0x{:x} but expected 16 bit value")
+                        }
+                        *address as u16
+                    }
                     None => bail!("Identifier {} can not be found", ident)
                 }
             }
@@ -64,6 +88,7 @@ pub enum Reg16Push {
 
 #[derive(PartialEq, Debug)]
 pub enum Flag {
+    Always,
     Z,
     NZ,
     C,
@@ -76,7 +101,6 @@ pub enum Flag {
 /// M16 - 8 bit value in memory pointed at by a 16 bit register (TODO: Is this just HL)
 /// I8  - immediate 8 bit value
 /// I16 - immediate 16 bit value
-
 #[derive(PartialEq, Debug)]
 pub enum Instruction {
     /// Keeping track of empty lines makes it easier to refer errors back to a line number
@@ -90,11 +114,12 @@ pub enum Instruction {
     Halt,
     Di,
     Ei,
-    RetFlag (Flag),
-    Ret,
+    Ret (Flag),
     Reti,
-    Call (Expr16),
-    CallFlag (Flag, Expr16),
+    Call  (Flag, Expr16),
+    JpI16 (Flag, Expr16),
+    JpHL,
+    Jr (Flag, Expr8),
     IncR16 (Reg16),
     IncR8  (Reg8),
     IncM8,
@@ -102,9 +127,6 @@ pub enum Instruction {
     DecR8  (Reg8),
     DecM8,
     LdR16I16 (Reg16, Expr16),
-    JpI16     (Expr16),
-    JpFlagI16 (Flag, Expr16),
-    JpHL,
     Push  (Reg16Push),
     Pop   (Reg16Push),
 }
@@ -127,43 +149,47 @@ impl Instruction {
             Instruction::Halt       => rom.push(0x76),
             Instruction::Di         => rom.push(0xF3),
             Instruction::Ei         => rom.push(0xFB),
-            Instruction::Ret        => rom.push(0xC9),
             Instruction::Reti       => rom.push(0xD9),
-            Instruction::RetFlag (flag)  => {
+            Instruction::Ret (flag)  => {
                 match flag {
-                    Flag::Z  => rom.push(0xC8),
-                    Flag::C  => rom.push(0xC9),
-                    Flag::NZ => rom.push(0xC0),
-                    Flag::NC => rom.push(0xD0),
+                    Flag::Always => rom.push(0xC9),
+                    Flag::Z      => rom.push(0xC8),
+                    Flag::C      => rom.push(0xC9),
+                    Flag::NZ     => rom.push(0xC0),
+                    Flag::NC     => rom.push(0xD0),
                 }
             }
-            Instruction::Call (expr)  => {
-                rom.push(0xCD);
-                rom.extend(expr.get_bytes(ident_to_address)?.iter());
-            }
-            Instruction::CallFlag (flag, expr)  => {
+            Instruction::Call (flag, expr)  => {
                 match flag {
-                    Flag::Z  => rom.push(0xCC),
-                    Flag::C  => rom.push(0xDC),
-                    Flag::NZ => rom.push(0xC4),
-                    Flag::NC => rom.push(0xD4),
+                    Flag::Always => rom.push(0xCD),
+                    Flag::Z      => rom.push(0xCC),
+                    Flag::C      => rom.push(0xDC),
+                    Flag::NZ     => rom.push(0xC4),
+                    Flag::NC     => rom.push(0xD4),
                 }
                 rom.extend(expr.get_bytes(ident_to_address)?.iter());
             }
-            Instruction::JpI16 (expr) => {
-                rom.push(0xC3);
-                rom.extend(expr.get_bytes(ident_to_address)?.iter());
-            }
-            Instruction::JpFlagI16 (flag, expr) => {
+            Instruction::JpI16 (flag, expr) => {
                 match flag {
-                    Flag::Z  => rom.push(0xCA),
-                    Flag::C  => rom.push(0xDA),
-                    Flag::NZ => rom.push(0xC2),
-                    Flag::NC => rom.push(0xD2),
+                    Flag::Always => rom.push(0xC3),
+                    Flag::Z      => rom.push(0xCA),
+                    Flag::C      => rom.push(0xDA),
+                    Flag::NZ     => rom.push(0xC2),
+                    Flag::NC     => rom.push(0xD2),
                 }
                 rom.extend(expr.get_bytes(ident_to_address)?.iter());
             }
             Instruction::JpHL => rom.push(0xE9),
+            Instruction::Jr (flag, expr) => {
+                match flag {
+                    Flag::Always => rom.push(0x18),
+                    Flag::Z      => rom.push(0x28),
+                    Flag::C      => rom.push(0x38),
+                    Flag::NZ     => rom.push(0x20),
+                    Flag::NC     => rom.push(0x30),
+                }
+                rom.push(expr.get_byte(ident_to_address)?);
+            }
             Instruction::IncR16 (reg) => {
                 match reg {
                     Reg16::BC => rom.push(0x03),
@@ -244,14 +270,12 @@ impl Instruction {
             Instruction::Halt            => 1,
             Instruction::Di              => 1,
             Instruction::Ei              => 1,
-            Instruction::RetFlag (_)     => 1,
-            Instruction::Ret             => 1,
+            Instruction::Ret (_)         => 1,
             Instruction::Reti            => 1,
-            Instruction::Call (_)        => 3,
-            Instruction::CallFlag (_,_)  => 3,
-            Instruction::JpI16 (_)       => 3,
-            Instruction::JpFlagI16 (_,_) => 3,
+            Instruction::Call (_,_)      => 3,
+            Instruction::JpI16 (_,_)     => 3,
             Instruction::JpHL            => 1,
+            Instruction::Jr (_,_)        => 2,
             Instruction::IncR16 (_)      => 1,
             Instruction::IncR8 (_)       => 1,
             Instruction::IncM8           => 1,
