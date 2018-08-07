@@ -57,15 +57,15 @@ fn u16_to_vec(input: u16) -> Vec<u8> {
     result
 }
 
-named!(parse_expr_u16<CompleteStr, ExprU16>,
+named!(parse_expr_u16<CompleteStr, Expr16>,
     alt!(
         do_parse!(
             value: parse_u16 >>
-            (ExprU16::U16(value))
+            (Expr16::U16(value))
         ) |
         do_parse!(
             ident: is_a!(IDENT) >>
-            (ExprU16::Ident(ident.to_string()))
+            (Expr16::Ident(ident.to_string()))
         )
     )
 );
@@ -200,9 +200,25 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("jp") >>
             is_a!(WHITESPACE) >>
+            tag_no_case!("hl") >>
+            end_line >>
+            (Instruction::JpHL)
+        ) |
+        do_parse!(
+            tag_no_case!("jp") >>
+            is_a!(WHITESPACE) >>
             expr: parse_expr_u16 >>
             end_line >>
-            (Instruction::Jp (expr))
+            (Instruction::JpI16 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("jp") >>
+            is_a!(WHITESPACE) >>
+            flag: parse_flag >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr_u16 >>
+            end_line >>
+            (Instruction::JpFlagI16 (flag, expr))
         ) |
         do_parse!(
             tag_no_case!("inc") >>
@@ -233,7 +249,7 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             expr: parse_expr_u16 >>
             end_line >>
-            (Instruction::LdReg16Immediate (reg, expr))
+            (Instruction::LdR16I16 (reg, expr))
         ) |
         do_parse!(
             tag_no_case!("push") >>

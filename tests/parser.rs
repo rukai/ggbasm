@@ -171,11 +171,11 @@ fn test_call() {
     assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
-        Instruction::CallFlag (Flag::Z, ExprU16::Ident(String::from("foobar"))),
-        Instruction::CallFlag (Flag::NZ, ExprU16::U16(0x1337)),
-        Instruction::CallFlag (Flag::C, ExprU16::U16(0)),
-        Instruction::CallFlag (Flag::NC, ExprU16::U16(42)),
-        Instruction::Call (ExprU16::U16(413)),
+        Instruction::CallFlag (Flag::Z, Expr16::Ident(String::from("foobar"))),
+        Instruction::CallFlag (Flag::NZ, Expr16::U16(0x1337)),
+        Instruction::CallFlag (Flag::C, Expr16::U16(0)),
+        Instruction::CallFlag (Flag::NC, Expr16::U16(42)),
+        Instruction::Call (Expr16::U16(413)),
     ]);
 }
 
@@ -308,14 +308,22 @@ a b c d
 fn test_jp() {
     let text = r#"
     jp 0x150
-    jp foo_bar
+    jp nz foo_bar
+    jp z 413
+    jp nc 1111
+    jp c 42
+    jp hl
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
-        Instruction::Jp (ExprU16::U16 (0x0150)),
-        Instruction::Jp (ExprU16::Ident (String::from("foo_bar"))),
+        Instruction::JpI16 (Expr16::U16 (0x0150)),
+        Instruction::JpFlagI16 (Flag::NZ, Expr16::Ident (String::from("foo_bar"))),
+        Instruction::JpFlagI16 (Flag::Z, Expr16::U16 (413)),
+        Instruction::JpFlagI16 (Flag::NC, Expr16::U16 (1111)),
+        Instruction::JpFlagI16 (Flag::C, Expr16::U16 (42)),
+        Instruction::JpHL,
     ]);
 }
 
@@ -391,11 +399,11 @@ fn test_ld() {
     assert_eq!(result.as_slice(),
     &[
         Instruction::EmptyLine,
-        Instruction::LdReg16Immediate (Reg16::BC, ExprU16::U16 (0x0413)),
-        Instruction::LdReg16Immediate (Reg16::BC, ExprU16::Ident (String::from("something"))),
-        Instruction::LdReg16Immediate (Reg16::DE, ExprU16::U16 (0x0413)),
-        Instruction::LdReg16Immediate (Reg16::HL, ExprU16::U16 (0x0413)),
-        Instruction::LdReg16Immediate (Reg16::SP, ExprU16::U16 (0x0413)),
+        Instruction::LdR16I16 (Reg16::BC, Expr16::U16 (0x0413)),
+        Instruction::LdR16I16 (Reg16::BC, Expr16::Ident (String::from("something"))),
+        Instruction::LdR16I16 (Reg16::DE, Expr16::U16 (0x0413)),
+        Instruction::LdR16I16 (Reg16::HL, Expr16::U16 (0x0413)),
+        Instruction::LdR16I16 (Reg16::SP, Expr16::U16 (0x0413)),
     ]);
 }
 

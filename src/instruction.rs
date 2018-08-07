@@ -7,27 +7,27 @@ use byteorder::{LittleEndian, ByteOrder};
 use crate::constants::*;
 
 #[derive(PartialEq, Debug)]
-pub enum ExprU8 {
+pub enum Expr8 {
     Ident (String),
     U8 (u8),
 }
 
 #[derive(PartialEq, Debug)]
-pub enum ExprU16 {
+pub enum Expr16 {
     Ident (String),
     U16 (u16),
 }
 
-impl ExprU16 {
+impl Expr16 {
     pub fn get_bytes(&self, ident_to_address: &HashMap<String, u32>) -> Result<[u8; 2], Error> {
         let value = match self {
-            ExprU16::Ident (ident) => {
+            Expr16::Ident (ident) => {
                 match ident_to_address.get(ident) {
                     Some(address) => (*address as u16),
                     None => bail!("Identifier {} can not be found", ident)
                 }
             }
-            ExprU16::U16 (value) => *value,
+            Expr16::U16 (value) => *value,
         };
         let mut result = [0, 0];
         LittleEndian::write_u16(&mut result, value);
@@ -70,6 +70,13 @@ pub enum Flag {
     NC
 }
 
+/// Key:
+/// R16 - 16 bit register
+/// R8  - 8 bit register
+/// M16 - 8 bit value in memory pointed at by a 16 bit register (TODO: Is this just HL)
+/// I8  - immediate 8 bit value
+/// I16 - immediate 16 bit value
+
 #[derive(PartialEq, Debug)]
 pub enum Instruction {
     /// Keeping track of empty lines makes it easier to refer errors back to a line number
@@ -86,16 +93,18 @@ pub enum Instruction {
     RetFlag (Flag),
     Ret,
     Reti,
-    Call (ExprU16),
-    CallFlag (Flag, ExprU16),
+    Call (Expr16),
+    CallFlag (Flag, Expr16),
     IncR16 (Reg16),
     IncR8  (Reg8),
     IncM8,
     DecR16 (Reg16),
     DecR8  (Reg8),
     DecM8,
-    LdReg16Immediate (Reg16, ExprU16),
-    Jp    (ExprU16),
+    LdR16I16 (Reg16, Expr16),
+    JpI16     (Expr16),
+    JpFlagI16 (Flag, Expr16),
+    JpHL,
     Push  (Reg16Push),
     Pop   (Reg16Push),
 }
@@ -141,10 +150,20 @@ impl Instruction {
                 }
                 rom.extend(expr.get_bytes(ident_to_address)?.iter());
             }
-            Instruction::Jp (expr) => {
+            Instruction::JpI16 (expr) => {
                 rom.push(0xC3);
                 rom.extend(expr.get_bytes(ident_to_address)?.iter());
             }
+            Instruction::JpFlagI16 (flag, expr) => {
+                match flag {
+                    Flag::Z  => rom.push(0xCA),
+                    Flag::C  => rom.push(0xDA),
+                    Flag::NZ => rom.push(0xC2),
+                    Flag::NC => rom.push(0xD2),
+                }
+                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+            }
+            Instruction::JpHL => rom.push(0xE9),
             Instruction::IncR16 (reg) => {
                 match reg {
                     Reg16::BC => rom.push(0x03),
@@ -185,7 +204,7 @@ impl Instruction {
                 }
             }
             Instruction::DecM8 => rom.push(0x035),
-            Instruction::LdReg16Immediate (reg, expr) => {
+            Instruction::LdR16I16 (reg, expr) => {
                 match reg {
                     Reg16::BC => rom.push(0x01),
                     Reg16::DE => rom.push(0x11),
@@ -217,29 +236,31 @@ impl Instruction {
     pub fn len(&self, start_address: u16) -> u16 {
         match self {
             Instruction::AdvanceAddress (advance_address) => advance_address - start_address,
-            Instruction::EmptyLine      => 0,
-            Instruction::Label (_)      => 0,
-            Instruction::Db (bytes)     => bytes.len() as u16,
-            Instruction::Nop            => 1,
-            Instruction::Stop           => 1,
-            Instruction::Halt           => 1,
-            Instruction::Di             => 1,
-            Instruction::Ei             => 1,
-            Instruction::RetFlag (_)    => 1,
-            Instruction::Ret            => 1,
-            Instruction::Reti           => 1,
-            Instruction::Call (_)       => 3,
-            Instruction::CallFlag (_,_) => 3,
-            Instruction::Jp (_)         => 3,
-            Instruction::IncR16 (_)     => 1,
-            Instruction::IncR8 (_)      => 1,
-            Instruction::IncM8          => 1,
-            Instruction::DecR16 (_)     => 1,
-            Instruction::DecR8 (_)      => 1,
-            Instruction::DecM8          => 1,
-            Instruction::LdReg16Immediate (_, _) => 3,
-            Instruction::Push (_) => 1,
-            Instruction::Pop  (_) => 1,
+            Instruction::EmptyLine       => 0,
+            Instruction::Label (_)       => 0,
+            Instruction::Db (bytes)      => bytes.len() as u16,
+            Instruction::Nop             => 1,
+            Instruction::Stop            => 1,
+            Instruction::Halt            => 1,
+            Instruction::Di              => 1,
+            Instruction::Ei              => 1,
+            Instruction::RetFlag (_)     => 1,
+            Instruction::Ret             => 1,
+            Instruction::Reti            => 1,
+            Instruction::Call (_)        => 3,
+            Instruction::CallFlag (_,_)  => 3,
+            Instruction::JpI16 (_)       => 3,
+            Instruction::JpFlagI16 (_,_) => 3,
+            Instruction::JpHL            => 1,
+            Instruction::IncR16 (_)      => 1,
+            Instruction::IncR8 (_)       => 1,
+            Instruction::IncM8           => 1,
+            Instruction::DecR16 (_)      => 1,
+            Instruction::DecR8 (_)       => 1,
+            Instruction::DecM8           => 1,
+            Instruction::LdR16I16 (_, _) => 3,
+            Instruction::Push (_)        => 1,
+            Instruction::Pop  (_)        => 1,
         }
     }
 }
