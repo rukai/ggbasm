@@ -98,7 +98,8 @@ pub enum Flag {
 /// Key:
 /// R16 - 16 bit register
 /// R8  - 8 bit register
-/// M16 - 8 bit value in memory pointed at by a 16 bit register (TODO: Is this just HL)
+/// M16 - 8 bit value in memory pointed at by a 16 bit register
+/// MHL - 8 bit value in memory pointed at by the HL register
 /// I8  - immediate 8 bit value
 /// I16 - immediate 16 bit value
 #[derive(PartialEq, Debug)]
@@ -127,6 +128,10 @@ pub enum Instruction {
     DecR8  (Reg8),
     DecM8,
     LdR16I16 (Reg16, Expr16),
+    //LdMHLI8,
+    //LdM16A
+    LdR8R8   (Reg8, Reg8),
+    LdR8I8   (Reg8, Expr8),
     Push  (Reg16Push),
     Pop   (Reg16Push),
 }
@@ -239,6 +244,44 @@ impl Instruction {
                 }
                 rom.extend(expr.get_bytes(ident_to_address)?.iter());
             }
+            Instruction::LdR8I8 (reg, expr) => {
+                match reg {
+                    Reg8::A => rom.push(0x3E),
+                    Reg8::B => rom.push(0x06),
+                    Reg8::C => rom.push(0x0E),
+                    Reg8::D => rom.push(0x16),
+                    Reg8::E => rom.push(0x1E),
+                    Reg8::H => rom.push(0x26),
+                    Reg8::L => rom.push(0x2E),
+                }
+                rom.push(expr.get_byte(ident_to_address)?);
+            }
+            Instruction::LdR8R8 (reg_in, reg_out) => {
+                let mut byte = 0;
+                // first 5 bits
+                byte |= match reg_in {
+                    Reg8::A => 0x78,
+                    Reg8::B => 0x40,
+                    Reg8::C => 0x48,
+                    Reg8::D => 0x50,
+                    Reg8::E => 0x58,
+                    Reg8::H => 0x60,
+                    Reg8::L => 0x68,
+                };
+
+                // last 3 bits
+                byte |= match reg_out {
+                    Reg8::A => 0x07,
+                    Reg8::B => 0x00,
+                    Reg8::C => 0x01,
+                    Reg8::D => 0x02,
+                    Reg8::E => 0x03,
+                    Reg8::H => 0x04,
+                    Reg8::L => 0x05,
+                };
+
+                rom.push(byte);
+            }
             Instruction::Push (reg) => {
                 match reg {
                     Reg16Push::BC => rom.push(0xC5),
@@ -283,6 +326,8 @@ impl Instruction {
             Instruction::DecR8 (_)       => 1,
             Instruction::DecM8           => 1,
             Instruction::LdR16I16 (_, _) => 3,
+            Instruction::LdR8I8 (_, _)   => 2,
+            Instruction::LdR8R8 (_, _)   => 1,
             Instruction::Push (_)        => 1,
             Instruction::Pop  (_)        => 1,
         }

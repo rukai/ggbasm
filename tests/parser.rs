@@ -9,52 +9,45 @@ fn test_empty() {
 #[test]
 fn test_single_newline() {
     let result: Vec<Instruction> = parse_asm("\n").unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
-        Instruction::EmptyLine
-    ]);
+    assert_eq!(result, vec!(Instruction::EmptyLine));
 }
 
 #[test]
 fn test_two_newline() {
     let result: Vec<Instruction> = parse_asm("\n\n").unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::EmptyLine,
-    ]);
+    ));
 }
 
 #[test]
 fn test_two_newline_and_space() {
     let result: Vec<Instruction> = parse_asm("\n   \n").unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::EmptyLine,
-    ]);
+    ));
 }
 
 #[test]
 fn test_final_newline_missing() {
     let result: Vec<Instruction> = parse_asm("nop\nnop\nnop").unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::Nop,
         Instruction::Nop,
         Instruction::Nop,
-    ]);
+    ));
 }
 
 #[test]
 fn test_final_newline_included() {
     let result: Vec<Instruction> = parse_asm("nop\nnop\nnop\n").unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::Nop,
         Instruction::Nop,
         Instruction::Nop,
-    ]);
+    ));
 }
 
 #[test]
@@ -85,8 +78,7 @@ stop
 whitespace_following: 
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::Nop,
         Instruction::Label(String::from("label")),
         Instruction::Nop,
@@ -111,7 +103,7 @@ whitespace_following:
         Instruction::Nop,
         Instruction::Stop,
         Instruction::Label(String::from("whitespace_following")),
-    ]);
+    ));
 }
 
 #[test]
@@ -124,15 +116,14 @@ fn test_simple_instructions() {
     ei
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::Nop,
         Instruction::Stop,
         Instruction::Halt,
         Instruction::Di,
         Instruction::Ei,
-    ]);
+    ));
 }
 
 #[test]
@@ -146,8 +137,7 @@ fn test_ret() {
     reti
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::Ret (Flag::Z),
         Instruction::Ret (Flag::NZ),
@@ -155,7 +145,7 @@ fn test_ret() {
         Instruction::Ret (Flag::NC),
         Instruction::Ret (Flag::Always),
         Instruction::Reti,
-    ]);
+    ));
 }
 
 #[test]
@@ -168,15 +158,14 @@ fn test_call() {
     call 413
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::Call (Flag::Z, Expr16::Ident(String::from("foobar"))),
         Instruction::Call (Flag::NZ, Expr16::U16(0x1337)),
         Instruction::Call (Flag::C, Expr16::U16(0)),
         Instruction::Call (Flag::NC, Expr16::U16(42)),
         Instruction::Call (Flag::Always, Expr16::U16(413)),
-    ]);
+    ));
 }
 
 #[test]
@@ -200,8 +189,7 @@ fn test_db() {
     db 4 13 "hammers"
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::Db (vec!(0)),
         Instruction::Db (vec!(255)),
@@ -219,7 +207,7 @@ fn test_db() {
         Instruction::Db (vec!(0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64, 0x21)),
         Instruction::Db (vec!(0x68, 0x69, 0x13, 37)),
         Instruction::Db (vec!(4, 13, 0x68, 0x61, 0x6d, 0x6d, 0x65, 0x72, 0x73)),
-    ]);
+    ));
 }
 
 #[test]
@@ -237,8 +225,7 @@ fn test_dw() {
     dw 0x1337
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::Db (vec!(0x00, 0x00)),
         Instruction::Db (vec!(0x9d, 0x01)),
@@ -250,7 +237,7 @@ fn test_dw() {
         Instruction::Db (vec!(0x00, 0x00)),
         Instruction::Db (vec!(0xFF, 0xFF)),
         Instruction::Db (vec!(0x37, 0x13)),
-    ]);
+    ));
 }
 
 #[test]
@@ -263,15 +250,14 @@ fn test_advance_address() {
     advance_address 0xFFFF
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::AdvanceAddress (0),
         Instruction::AdvanceAddress (0x0),
         Instruction::AdvanceAddress (413),
         Instruction::AdvanceAddress (0x1337),
         Instruction::AdvanceAddress (0xFFFF),
-    ]);
+    ));
 }
 
 #[test]
@@ -288,8 +274,7 @@ fn test_invalid_instruction() {
     nop
 a b c d
 "#;
-    assert_eq!(parse_asm(text).unwrap().as_slice(),
-    &[
+    assert_eq!(parse_asm(text).unwrap(), vec!(
         Some(Instruction::EmptyLine),
         Some(Instruction::Nop),
         Some(Instruction::EmptyLine),
@@ -301,7 +286,7 @@ a b c d
         None,
         Some(Instruction::Nop),
         None,
-    ]);
+    ));
 }
 
 #[test]
@@ -315,8 +300,7 @@ fn test_jp() {
     jp hl
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::JpI16 (Flag::Always, Expr16::U16 (0x0150)),
         Instruction::JpI16 (Flag::NZ,     Expr16::Ident (String::from("foo_bar"))),
@@ -324,7 +308,7 @@ fn test_jp() {
         Instruction::JpI16 (Flag::NC,     Expr16::U16 (1111)),
         Instruction::JpI16 (Flag::C,      Expr16::U16 (42)),
         Instruction::JpHL,
-    ]);
+    ));
 }
 
 #[test]
@@ -337,15 +321,14 @@ fn test_jr() {
     jr c 42
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::Jr (Flag::Always, Expr8::U8 (0x42)),
         Instruction::Jr (Flag::NZ,     Expr8::Ident (String::from("foo_bar"))),
         Instruction::Jr (Flag::Z,      Expr8::U8 (255)),
         Instruction::Jr (Flag::NC,     Expr8::U8 (11)),
         Instruction::Jr (Flag::C,      Expr8::U8 (42)),
-    ]);
+    ));
 }
 
 #[test]
@@ -377,8 +360,7 @@ fn test_inc_dec() {
     dec [hl]
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::IncR16 (Reg16::BC),
         Instruction::IncR16 (Reg16::DE),
@@ -404,7 +386,7 @@ fn test_inc_dec() {
         Instruction::DecR8  (Reg8::H),
         Instruction::DecR8  (Reg8::L),
         Instruction::DecM8,
-    ]);
+    ));
 }
 
 #[test]
@@ -415,17 +397,132 @@ fn test_ld() {
     ld DE 0x413
     ld HL 0x413
     ld SP 0x413
+
+    ld a 0xFF
+    ld b foo
+    ld c 0x10
+    ld d 42
+    ld e 42
+    ld h 42
+    ld l 42
+
+    ld a a
+    ld a b
+    ld a c
+    ld a d
+    ld a e
+    ld a h
+    ld a l
+    ld b a
+    ld b b
+    ld b c
+    ld b d
+    ld b e
+    ld b h
+    ld b l
+    ld c a
+    ld c b
+    ld c c
+    ld c d
+    ld c e
+    ld c h
+    ld c l
+    ld d a
+    ld d b
+    ld d c
+    ld d d
+    ld d e
+    ld d h
+    ld d l
+    ld e a
+    ld e b
+    ld e c
+    ld e d
+    ld e e
+    ld e h
+    ld e l
+    ld h a
+    ld h b
+    ld h c
+    ld h d
+    ld h e
+    ld h h
+    ld h l
+    ld l a
+    ld l b
+    ld l c
+    ld l d
+    ld l e
+    ld l h
+    ld l l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::LdR16I16 (Reg16::BC, Expr16::U16 (0x0413)),
         Instruction::LdR16I16 (Reg16::BC, Expr16::Ident (String::from("something"))),
         Instruction::LdR16I16 (Reg16::DE, Expr16::U16 (0x0413)),
         Instruction::LdR16I16 (Reg16::HL, Expr16::U16 (0x0413)),
         Instruction::LdR16I16 (Reg16::SP, Expr16::U16 (0x0413)),
-    ]);
+        Instruction::EmptyLine,
+        Instruction::LdR8I8 (Reg8::A, Expr8::U8 (0xFF)),
+        Instruction::LdR8I8 (Reg8::B, Expr8::Ident (String::from("foo"))),
+        Instruction::LdR8I8 (Reg8::C, Expr8::U8 (0x10)),
+        Instruction::LdR8I8 (Reg8::D, Expr8::U8 (42)),
+        Instruction::LdR8I8 (Reg8::E, Expr8::U8 (42)),
+        Instruction::LdR8I8 (Reg8::H, Expr8::U8 (42)),
+        Instruction::LdR8I8 (Reg8::L, Expr8::U8 (42)),
+        Instruction::EmptyLine,
+        Instruction::LdR8R8 (Reg8::A, Reg8::A),
+        Instruction::LdR8R8 (Reg8::A, Reg8::B),
+        Instruction::LdR8R8 (Reg8::A, Reg8::C),
+        Instruction::LdR8R8 (Reg8::A, Reg8::D),
+        Instruction::LdR8R8 (Reg8::A, Reg8::E),
+        Instruction::LdR8R8 (Reg8::A, Reg8::H),
+        Instruction::LdR8R8 (Reg8::A, Reg8::L),
+        Instruction::LdR8R8 (Reg8::B, Reg8::A),
+        Instruction::LdR8R8 (Reg8::B, Reg8::B),
+        Instruction::LdR8R8 (Reg8::B, Reg8::C),
+        Instruction::LdR8R8 (Reg8::B, Reg8::D),
+        Instruction::LdR8R8 (Reg8::B, Reg8::E),
+        Instruction::LdR8R8 (Reg8::B, Reg8::H),
+        Instruction::LdR8R8 (Reg8::B, Reg8::L),
+        Instruction::LdR8R8 (Reg8::C, Reg8::A),
+        Instruction::LdR8R8 (Reg8::C, Reg8::B),
+        Instruction::LdR8R8 (Reg8::C, Reg8::C),
+        Instruction::LdR8R8 (Reg8::C, Reg8::D),
+        Instruction::LdR8R8 (Reg8::C, Reg8::E),
+        Instruction::LdR8R8 (Reg8::C, Reg8::H),
+        Instruction::LdR8R8 (Reg8::C, Reg8::L),
+        Instruction::LdR8R8 (Reg8::D, Reg8::A),
+        Instruction::LdR8R8 (Reg8::D, Reg8::B),
+        Instruction::LdR8R8 (Reg8::D, Reg8::C),
+        Instruction::LdR8R8 (Reg8::D, Reg8::D),
+        Instruction::LdR8R8 (Reg8::D, Reg8::E),
+        Instruction::LdR8R8 (Reg8::D, Reg8::H),
+        Instruction::LdR8R8 (Reg8::D, Reg8::L),
+        Instruction::LdR8R8 (Reg8::E, Reg8::A),
+        Instruction::LdR8R8 (Reg8::E, Reg8::B),
+        Instruction::LdR8R8 (Reg8::E, Reg8::C),
+        Instruction::LdR8R8 (Reg8::E, Reg8::D),
+        Instruction::LdR8R8 (Reg8::E, Reg8::E),
+        Instruction::LdR8R8 (Reg8::E, Reg8::H),
+        Instruction::LdR8R8 (Reg8::E, Reg8::L),
+        Instruction::LdR8R8 (Reg8::H, Reg8::A),
+        Instruction::LdR8R8 (Reg8::H, Reg8::B),
+        Instruction::LdR8R8 (Reg8::H, Reg8::C),
+        Instruction::LdR8R8 (Reg8::H, Reg8::D),
+        Instruction::LdR8R8 (Reg8::H, Reg8::E),
+        Instruction::LdR8R8 (Reg8::H, Reg8::H),
+        Instruction::LdR8R8 (Reg8::H, Reg8::L),
+        Instruction::LdR8R8 (Reg8::L, Reg8::A),
+        Instruction::LdR8R8 (Reg8::L, Reg8::B),
+        Instruction::LdR8R8 (Reg8::L, Reg8::C),
+        Instruction::LdR8R8 (Reg8::L, Reg8::D),
+        Instruction::LdR8R8 (Reg8::L, Reg8::E),
+        Instruction::LdR8R8 (Reg8::L, Reg8::H),
+        Instruction::LdR8R8 (Reg8::L, Reg8::L),
+    ));
 }
 
 #[test]
@@ -441,8 +538,7 @@ fn test_push_pop() {
     pop AF
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result.as_slice(),
-    &[
+    assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::Push (Reg16Push::BC),
         Instruction::Push (Reg16Push::DE),
@@ -452,5 +548,5 @@ fn test_push_pop() {
         Instruction::Pop  (Reg16Push::DE),
         Instruction::Pop  (Reg16Push::HL),
         Instruction::Pop  (Reg16Push::AF),
-    ]);
+    ));
 }

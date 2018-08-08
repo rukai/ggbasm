@@ -274,6 +274,24 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
+            reg1: parse_reg_u8 >>
+            is_a!(WHITESPACE) >>
+            reg2: parse_reg_u8 >>
+            end_line >>
+            (Instruction::LdR8R8 (reg1, reg2))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            reg1: parse_reg_u8 >>
+            is_a!(WHITESPACE) >>
+            reg2: parse_expr8 >>
+            end_line >>
+            (Instruction::LdR8I8 (reg1, reg2))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
             reg: parse_reg_u16 >>
             is_a!(WHITESPACE) >>
             expr: parse_expr16 >>
