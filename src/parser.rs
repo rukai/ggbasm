@@ -122,6 +122,17 @@ named!(parse_flag<CompleteStr, Flag>,
     )
 );
 
+named!(deref_hl<CompleteStr, CompleteStr>,
+    do_parse!(
+        tag_no_case!("[") >>
+        opt!(is_a!(WHITESPACE)) >>
+        a : tag_no_case!("hl") >>
+        opt!(is_a!(WHITESPACE)) >>
+        tag_no_case!("]") >>
+        (a)
+    )
+);
+
 named!(parse_string<CompleteStr, Vec<u8> >,
     delimited!(
         tag!("\""),
@@ -215,7 +226,7 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             tag_no_case!("hl") >>
             end_line >>
-            (Instruction::JpHL)
+            (Instruction::JpRhl)
         ) |
         do_parse!(
             tag_no_case!("jp") >>
@@ -252,24 +263,24 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("inc") >>
             is_a!(WHITESPACE) >>
-            reg: alt!(
+            instruction: alt!(
                 do_parse!(reg: parse_reg_u16 >> (Instruction::IncR16 (reg))) |
                 do_parse!(reg: parse_reg_u8  >> (Instruction::IncR8  (reg))) |
-                value!(Instruction::IncM8, tag_no_case!("[hl]"))
+                value!(Instruction::IncMRhl, deref_hl)
             ) >>
             end_line >>
-            (reg)
+            (instruction)
         ) |
         do_parse!(
             tag_no_case!("dec") >>
             is_a!(WHITESPACE) >>
-            reg: alt!(
+            instruction: alt!(
                 do_parse!(reg: parse_reg_u16 >> (Instruction::DecR16 (reg))) |
                 do_parse!(reg: parse_reg_u8  >> (Instruction::DecR8  (reg))) |
-                value!(Instruction::DecM8, tag_no_case!("[hl]"))
+                value!(Instruction::DecMRhl, deref_hl)
             ) >>
             end_line >>
-            (reg)
+            (instruction)
         ) |
         do_parse!(
             tag_no_case!("ld") >>
@@ -292,11 +303,227 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
+            tag_no_case!("sp") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("hl") >>
+            end_line >>
+            (Instruction::LdRspRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
             reg: parse_reg_u16 >>
             is_a!(WHITESPACE) >>
             expr: parse_expr16 >>
             end_line >>
             (Instruction::LdR16I16 (reg, expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("[") >>
+            opt!(is_a!(WHITESPACE)) >>
+            expr: parse_expr16 >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("]") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("sp") >>
+            end_line >>
+            (Instruction::LdMI16Rsp (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            instruction: alt!(
+                value!(Instruction::LdMRbcRa, tag_no_case!("[bc]")) |
+                value!(Instruction::LdMRdeRa, tag_no_case!("[de]"))
+            ) >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            end_line >>
+            (instruction)
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            is_a!(WHITESPACE) >>
+            instruction: alt!(
+                value!(Instruction::LdRaMRbc, tag_no_case!("[bc]")) |
+                value!(Instruction::LdRaMRde, tag_no_case!("[de]"))
+            ) >>
+            end_line >>
+            (instruction)
+        ) |
+        do_parse!(
+            tag_no_case!("ldi") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            end_line >>
+            (Instruction::LdiMRhlRa)
+        ) |
+        do_parse!(
+            tag_no_case!("ldd") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            end_line >>
+            (Instruction::LddMRhlRa)
+        ) |
+        do_parse!(
+            tag_no_case!("ldi") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::LdiRaMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("ldd") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::LddRaMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::LdMRhlR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr8 >>
+            end_line >>
+            (Instruction::LdMRhlI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::LdR8MRhl (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("[") >>
+            opt!(is_a!(WHITESPACE)) >>
+            expr: parse_expr16 >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("]") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            end_line >>
+            (Instruction::LdMI16Ra (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("[") >>
+            opt!(is_a!(WHITESPACE)) >>
+            expr: parse_expr16 >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("]") >>
+            end_line >>
+            (Instruction::LdRaMI16 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("[") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("0xFF00") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("+") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("c") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("]") >>
+            end_line >>
+            (Instruction::LdhRaMRc)
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("[") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("0xFF00") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("+") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("c") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("]") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            end_line >>
+            (Instruction::LdhMRcRa)
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("[") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("0xFF00") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("+") >>
+            opt!(is_a!(WHITESPACE)) >>
+            expr: parse_expr8 >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("]") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            end_line >>
+            (Instruction::LdhMI8Ra (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("[") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("0xFF00") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("+") >>
+            opt!(is_a!(WHITESPACE)) >>
+            expr: parse_expr8 >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("]") >>
+            end_line >>
+            (Instruction::LdhRaMI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("hl") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("sp") >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("+") >>
+            opt!(is_a!(WHITESPACE)) >>
+            expr: parse_expr8 >>
+            end_line >>
+            (Instruction::LdRhlRspI8 (expr))
         ) |
         do_parse!(
             tag_no_case!("push") >>

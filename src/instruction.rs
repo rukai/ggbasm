@@ -98,8 +98,11 @@ pub enum Flag {
 /// Key:
 /// R16 - 16 bit register
 /// R8  - 8 bit register
-/// M16 - 8 bit value in memory pointed at by a 16 bit register
-/// MHL - 8 bit value in memory pointed at by the HL register
+/// Rhl - the hl register
+/// Ra  - the a register
+/// MR16 - 8 bit value in memory pointed at by a 16 bit register
+/// MRhl - 8 bit value in memory pointed at by the HL register
+/// MRc - 8 bit value in memory pointed at by 0xFF + the register C
 /// I8  - immediate 8 bit value
 /// I16 - immediate 16 bit value
 #[derive(PartialEq, Debug)]
@@ -119,24 +122,45 @@ pub enum Instruction {
     Reti,
     Call  (Flag, Expr16),
     JpI16 (Flag, Expr16),
-    JpHL,
+    JpRhl,
     Jr (Flag, Expr8),
     IncR16 (Reg16),
     IncR8  (Reg8),
-    IncM8,
+    IncMRhl,
     DecR16 (Reg16),
     DecR8  (Reg8),
-    DecM8,
+    DecMRhl,
     LdR16I16 (Reg16, Expr16),
-    //LdMHLI8,
-    //LdM16A
-    LdR8R8   (Reg8, Reg8),
-    LdR8I8   (Reg8, Expr8),
-    Push  (Reg16Push),
-    Pop   (Reg16Push),
+    LdMI16Rsp (Expr16),
+    LdMRbcRa,
+    LdMRdeRa,
+    LdRaMRbc,
+    LdRaMRde,
+    LdR8R8  (Reg8, Reg8),
+    LdR8I8  (Reg8, Expr8),
+    LdR8MRhl (Reg8),
+    LdMRhlR8 (Reg8),
+    LdMRhlI8 (Expr8),
+    LdMI16Ra (Expr16),
+    LdRaMI16 (Expr16),
+    LdhRaMI8 (Expr8),
+    LdhMI8Ra (Expr8),
+    LdhRaMRc,
+    LdhMRcRa,
+    LdiMRhlRa,
+    LddMRhlRa,
+    LdiRaMRhl,
+    LddRaMRhl,
+    LdRhlRspI8 (Expr8),
+    LdRspRhl,
+    Push (Reg16Push),
+    Pop  (Reg16Push),
 }
 
 impl Instruction {
+    /// Writes the instructions bytes to the passed rom
+    /// If an expr in the instruction uses an identifier than it looks up the value for it in ident_to_address
+    /// Will return Err if ident_to_address doesnt contain the required label
     pub fn write_to_rom(&self, rom: &mut Vec<u8>, ident_to_address: &HashMap<String, u32>) -> Result<(), Error> {
         match self {
             Instruction::AdvanceAddress (advance_address) => {
@@ -184,7 +208,7 @@ impl Instruction {
                 }
                 rom.extend(expr.get_bytes(ident_to_address)?.iter());
             }
-            Instruction::JpHL => rom.push(0xE9),
+            Instruction::JpRhl => rom.push(0xE9),
             Instruction::Jr (flag, expr) => {
                 match flag {
                     Flag::Always => rom.push(0x18),
@@ -214,7 +238,7 @@ impl Instruction {
                     Reg8::L => rom.push(0x2C),
                 }
             }
-            Instruction::IncM8 => rom.push(0x034),
+            Instruction::IncMRhl => rom.push(0x034),
             Instruction::DecR16 (reg) => {
                 match reg {
                     Reg16::BC => rom.push(0x0B),
@@ -234,7 +258,7 @@ impl Instruction {
                     Reg8::L => rom.push(0x2D),
                 }
             }
-            Instruction::DecM8 => rom.push(0x035),
+            Instruction::DecMRhl => rom.push(0x035),
             Instruction::LdR16I16 (reg, expr) => {
                 match reg {
                     Reg16::BC => rom.push(0x01),
@@ -242,6 +266,10 @@ impl Instruction {
                     Reg16::HL => rom.push(0x21),
                     Reg16::SP => rom.push(0x31),
                 }
+                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+            }
+            Instruction::LdMI16Rsp (expr) => {
+                rom.push(0x08);
                 rom.extend(expr.get_bytes(ident_to_address)?.iter());
             }
             Instruction::LdR8I8 (reg, expr) => {
@@ -282,6 +310,63 @@ impl Instruction {
 
                 rom.push(byte);
             }
+            Instruction::LdMRbcRa => rom.push(0x02),
+            Instruction::LdMRdeRa => rom.push(0x12),
+            Instruction::LdRaMRbc => rom.push(0x0A),
+            Instruction::LdRaMRde => rom.push(0x1A),
+            Instruction::LdR8MRhl (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0x7E),
+                    Reg8::B => rom.push(0x46),
+                    Reg8::C => rom.push(0x4E),
+                    Reg8::D => rom.push(0x56),
+                    Reg8::E => rom.push(0x5E),
+                    Reg8::H => rom.push(0x66),
+                    Reg8::L => rom.push(0x6E),
+                }
+            }
+            Instruction::LdMRhlR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0x77),
+                    Reg8::B => rom.push(0x70),
+                    Reg8::C => rom.push(0x71),
+                    Reg8::D => rom.push(0x72),
+                    Reg8::E => rom.push(0x73),
+                    Reg8::H => rom.push(0x74),
+                    Reg8::L => rom.push(0x75),
+                }
+            }
+            Instruction::LdMRhlI8 (expr) => {
+                rom.push(0x36);
+                rom.push(expr.get_byte(ident_to_address)?);
+            }
+            Instruction::LdMI16Ra (expr) => {
+                rom.push(0xEA);
+                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+            }
+            Instruction::LdRaMI16 (expr) => {
+                rom.push(0xFA);
+                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+            }
+            Instruction::LdhRaMI8 (expr) => {
+                rom.push(0xF0);
+                rom.push(expr.get_byte(ident_to_address)?);
+            }
+            Instruction::LdhMI8Ra (expr) => {
+                rom.push(0xE0);
+                rom.push(expr.get_byte(ident_to_address)?);
+            }
+            Instruction::LdhRaMRc  => rom.push(0xF2),
+            Instruction::LdhMRcRa  => rom.push(0xE2),
+            Instruction::LdiMRhlRa => rom.push(0x22),
+            Instruction::LddMRhlRa => rom.push(0x32),
+            Instruction::LdiRaMRhl => rom.push(0x2A),
+            Instruction::LddRaMRhl => rom.push(0x3A),
+            Instruction::LdRspRhl  => rom.push(0xF9),
+            Instruction::LdRhlRspI8 (expr) => {
+                rom.push(0xF8);
+                rom.push(expr.get_byte(ident_to_address)?);
+            }
             Instruction::Push (reg) => {
                 match reg {
                     Reg16Push::BC => rom.push(0xC5),
@@ -302,6 +387,7 @@ impl Instruction {
         Ok(())
     }
 
+    /// Returns how many bytes the instruction takes up
     pub fn len(&self, start_address: u16) -> u16 {
         match self {
             Instruction::AdvanceAddress (advance_address) => advance_address - start_address,
@@ -317,17 +403,37 @@ impl Instruction {
             Instruction::Reti            => 1,
             Instruction::Call (_,_)      => 3,
             Instruction::JpI16 (_,_)     => 3,
-            Instruction::JpHL            => 1,
+            Instruction::JpRhl           => 1,
             Instruction::Jr (_,_)        => 2,
             Instruction::IncR16 (_)      => 1,
             Instruction::IncR8 (_)       => 1,
-            Instruction::IncM8           => 1,
+            Instruction::IncMRhl         => 1,
             Instruction::DecR16 (_)      => 1,
             Instruction::DecR8 (_)       => 1,
-            Instruction::DecM8           => 1,
+            Instruction::DecMRhl         => 1,
             Instruction::LdR16I16 (_, _) => 3,
+            Instruction::LdMI16Rsp (_)   => 3,
             Instruction::LdR8I8 (_, _)   => 2,
             Instruction::LdR8R8 (_, _)   => 1,
+            Instruction::LdMRbcRa        => 1,
+            Instruction::LdMRdeRa        => 1,
+            Instruction::LdRaMRbc        => 1,
+            Instruction::LdRaMRde        => 1,
+            Instruction::LdR8MRhl (_)    => 1,
+            Instruction::LdMRhlR8 (_)    => 1,
+            Instruction::LdMRhlI8 (_)    => 2,
+            Instruction::LdMI16Ra (_)    => 3,
+            Instruction::LdRaMI16 (_)    => 3,
+            Instruction::LdhRaMI8 (_)    => 2,
+            Instruction::LdhMI8Ra (_)    => 2,
+            Instruction::LdhRaMRc        => 1,
+            Instruction::LdhMRcRa        => 1,
+            Instruction::LdiMRhlRa       => 1,
+            Instruction::LddMRhlRa       => 1,
+            Instruction::LdiRaMRhl       => 1,
+            Instruction::LddRaMRhl       => 1,
+            Instruction::LdRhlRspI8 (_)  => 2,
+            Instruction::LdRspRhl        => 1,
             Instruction::Push (_)        => 1,
             Instruction::Pop  (_)        => 1,
         }

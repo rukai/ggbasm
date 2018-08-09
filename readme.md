@@ -47,4 +47,3 @@ I assume other assemblers are similar.
     +   hexadecimal is represented as 0x2a instead of $2a
     +   uses `advance_address 0xYYYY` instead of `section "FOO",$HOME[$YY]`
     +   no commas between arguments: `ld a b` instead of `ld a, b`
-    +   the load high instruction from RGBDS `ld [$FF00 + $YY], a` is automatically used when doing `ld [0xFFYY] a`

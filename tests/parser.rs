@@ -307,7 +307,7 @@ fn test_jp() {
         Instruction::JpI16 (Flag::Z,      Expr16::U16 (413)),
         Instruction::JpI16 (Flag::NC,     Expr16::U16 (1111)),
         Instruction::JpI16 (Flag::C,      Expr16::U16 (42)),
-        Instruction::JpHL,
+        Instruction::JpRhl,
     ));
 }
 
@@ -373,7 +373,7 @@ fn test_inc_dec() {
         Instruction::IncR8  (Reg8::E),
         Instruction::IncR8  (Reg8::H),
         Instruction::IncR8  (Reg8::L),
-        Instruction::IncM8,
+        Instruction::IncMRhl,
         Instruction::DecR16 (Reg16::BC),
         Instruction::DecR16 (Reg16::DE),
         Instruction::DecR16 (Reg16::HL),
@@ -385,27 +385,13 @@ fn test_inc_dec() {
         Instruction::DecR8  (Reg8::E),
         Instruction::DecR8  (Reg8::H),
         Instruction::DecR8  (Reg8::L),
-        Instruction::DecM8,
+        Instruction::DecMRhl,
     ));
 }
 
 #[test]
-fn test_ld() {
+fn test_ld_r8_r8() {
     let text = r#"
-    ld BC 0x0413
-    ld BC something
-    ld DE 0x413
-    ld HL 0x413
-    ld SP 0x413
-
-    ld a 0xFF
-    ld b foo
-    ld c 0x10
-    ld d 42
-    ld e 42
-    ld h 42
-    ld l 42
-
     ld a a
     ld a b
     ld a c
@@ -459,20 +445,6 @@ fn test_ld() {
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
         Instruction::EmptyLine,
-        Instruction::LdR16I16 (Reg16::BC, Expr16::U16 (0x0413)),
-        Instruction::LdR16I16 (Reg16::BC, Expr16::Ident (String::from("something"))),
-        Instruction::LdR16I16 (Reg16::DE, Expr16::U16 (0x0413)),
-        Instruction::LdR16I16 (Reg16::HL, Expr16::U16 (0x0413)),
-        Instruction::LdR16I16 (Reg16::SP, Expr16::U16 (0x0413)),
-        Instruction::EmptyLine,
-        Instruction::LdR8I8 (Reg8::A, Expr8::U8 (0xFF)),
-        Instruction::LdR8I8 (Reg8::B, Expr8::Ident (String::from("foo"))),
-        Instruction::LdR8I8 (Reg8::C, Expr8::U8 (0x10)),
-        Instruction::LdR8I8 (Reg8::D, Expr8::U8 (42)),
-        Instruction::LdR8I8 (Reg8::E, Expr8::U8 (42)),
-        Instruction::LdR8I8 (Reg8::H, Expr8::U8 (42)),
-        Instruction::LdR8I8 (Reg8::L, Expr8::U8 (42)),
-        Instruction::EmptyLine,
         Instruction::LdR8R8 (Reg8::A, Reg8::A),
         Instruction::LdR8R8 (Reg8::A, Reg8::B),
         Instruction::LdR8R8 (Reg8::A, Reg8::C),
@@ -522,6 +494,143 @@ fn test_ld() {
         Instruction::LdR8R8 (Reg8::L, Reg8::E),
         Instruction::LdR8R8 (Reg8::L, Reg8::H),
         Instruction::LdR8R8 (Reg8::L, Reg8::L),
+    ));
+}
+#[test]
+fn test_ld() {
+    let text = r#"
+    ld BC 0x0413
+    ld BC something
+    ld DE 0x413
+    ld HL 0x413
+    ld SP 0x413
+
+    ld [0x3535] sp
+    ld [ 0x3535 ] sp
+    ld [0x3535  ] sp
+    ld [    0x3535] sp
+    ld [    0x3535  ] sp
+
+    ld a 0xFF
+    ld b foo
+    ld c 0x10
+    ld d 42
+    ld e 42
+    ld h 42
+    ld l 42
+
+    ld [bc] a
+    ld [de] a
+    ld a [bc]
+    ld a [de]
+
+    ldi [hl] a
+    ldd [hl] a
+    ldi a [hl]
+    ldd a [hl]
+
+    ld [hl] 42
+
+    ld a [hl]
+    ld b [hl]
+    ld c [hl]
+    ld d [hl]
+    ld e [hl]
+    ld h [hl]
+    ld l [hl]
+
+    ld [hl] a
+    ld [hl] b
+    ld [hl] c
+    ld [hl] d
+    ld [hl] e
+    ld [hl] h
+    ld [hl] l
+
+    ld [0xFF00 + 42] a
+    ld [0xFF00+42] a
+    ld a [0xFF00 + 42]
+    ld a [0xFF00+42]
+
+    ld [0xFF00 + c] a
+    ld [0xFF00+c] a
+    ld [  0xFF00   +   c   ] a
+    ld a [0xFF00 + c]
+    ld a [0xFF00+c]
+
+    ld hl sp+13
+    ld hl sp + 13
+    ld sp hl
+    ld [0x413] a
+    ld a [0x0413]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::LdR16I16 (Reg16::BC, Expr16::U16 (0x0413)),
+        Instruction::LdR16I16 (Reg16::BC, Expr16::Ident (String::from("something"))),
+        Instruction::LdR16I16 (Reg16::DE, Expr16::U16 (0x0413)),
+        Instruction::LdR16I16 (Reg16::HL, Expr16::U16 (0x0413)),
+        Instruction::LdR16I16 (Reg16::SP, Expr16::U16 (0x0413)),
+        Instruction::EmptyLine,
+        Instruction::LdMI16Rsp (Expr16::U16 (0x3535)),
+        Instruction::LdMI16Rsp (Expr16::U16 (0x3535)),
+        Instruction::LdMI16Rsp (Expr16::U16 (0x3535)),
+        Instruction::LdMI16Rsp (Expr16::U16 (0x3535)),
+        Instruction::LdMI16Rsp (Expr16::U16 (0x3535)),
+        Instruction::EmptyLine,
+        Instruction::LdR8I8 (Reg8::A, Expr8::U8 (0xFF)),
+        Instruction::LdR8I8 (Reg8::B, Expr8::Ident (String::from("foo"))),
+        Instruction::LdR8I8 (Reg8::C, Expr8::U8 (0x10)),
+        Instruction::LdR8I8 (Reg8::D, Expr8::U8 (42)),
+        Instruction::LdR8I8 (Reg8::E, Expr8::U8 (42)),
+        Instruction::LdR8I8 (Reg8::H, Expr8::U8 (42)),
+        Instruction::LdR8I8 (Reg8::L, Expr8::U8 (42)),
+        Instruction::EmptyLine,
+        Instruction::LdMRbcRa,
+        Instruction::LdMRdeRa,
+        Instruction::LdRaMRbc,
+        Instruction::LdRaMRde,
+        Instruction::EmptyLine,
+        Instruction::LdiMRhlRa,
+        Instruction::LddMRhlRa,
+        Instruction::LdiRaMRhl,
+        Instruction::LddRaMRhl,
+        Instruction::EmptyLine,
+        Instruction::LdMRhlI8 (Expr8::U8 (42)),
+        Instruction::EmptyLine,
+        Instruction::LdR8MRhl (Reg8::A),
+        Instruction::LdR8MRhl (Reg8::B),
+        Instruction::LdR8MRhl (Reg8::C),
+        Instruction::LdR8MRhl (Reg8::D),
+        Instruction::LdR8MRhl (Reg8::E),
+        Instruction::LdR8MRhl (Reg8::H),
+        Instruction::LdR8MRhl (Reg8::L),
+        Instruction::EmptyLine,
+        Instruction::LdMRhlR8 (Reg8::A),
+        Instruction::LdMRhlR8 (Reg8::B),
+        Instruction::LdMRhlR8 (Reg8::C),
+        Instruction::LdMRhlR8 (Reg8::D),
+        Instruction::LdMRhlR8 (Reg8::E),
+        Instruction::LdMRhlR8 (Reg8::H),
+        Instruction::LdMRhlR8 (Reg8::L),
+        Instruction::EmptyLine,
+        Instruction::LdhMI8Ra (Expr8::U8 (42)),
+        Instruction::LdhMI8Ra (Expr8::U8 (42)),
+        Instruction::LdhRaMI8 (Expr8::U8 (42)),
+        Instruction::LdhRaMI8 (Expr8::U8 (42)),
+        Instruction::EmptyLine,
+        Instruction::LdhMRcRa,
+        Instruction::LdhMRcRa,
+        Instruction::LdhMRcRa,
+        Instruction::LdhRaMRc,
+        Instruction::LdhRaMRc,
+        Instruction::EmptyLine,
+        Instruction::LdRhlRspI8 (Expr8::U8 (13)),
+        Instruction::LdRhlRspI8 (Expr8::U8 (13)),
+        Instruction::LdRspRhl,
+        Instruction::LdMI16Ra (Expr16::U16 (0x413)),
+        Instruction::LdRaMI16 (Expr16::U16 (0x413)),
     ));
 }
 
