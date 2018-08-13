@@ -56,7 +56,7 @@ fn test_whacky_line_handling() {
 label:
     nop
 
-0this_-complicated_id3ntifi3r:
+0this_complicated_id3ntifi3r:
 
 nop
 
@@ -83,7 +83,7 @@ whitespace_following:
         Instruction::Label(String::from("label")),
         Instruction::Nop,
         Instruction::EmptyLine,
-        Instruction::Label(String::from("0this_-complicated_id3ntifi3r")),
+        Instruction::Label(String::from("0this_complicated_id3ntifi3r")),
         Instruction::EmptyLine,
         Instruction::Nop,
         Instruction::EmptyLine,
@@ -123,6 +123,82 @@ fn test_simple_instructions() {
         Instruction::Halt,
         Instruction::Di,
         Instruction::Ei,
+    ));
+}
+
+#[test]
+fn test_exprs_simple() {
+    let text = r#"
+    jp foo_bar
+    jp foo + bar
+    jp foo - bar
+    jp foo * bar
+    jp foo / bar
+    jp foo % bar
+
+    jp foo-42
+    jp 413*1111
+    jp foo /0x40
+    jp foo% bar
+
+    jp z foo_bar
+    jp z foo + bar
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::JpI16 (Flag::Always, Expr::Ident (String::from("foo_bar"))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::Ident(String::from("bar")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Sub, Expr::Ident(String::from("bar")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Mul, Expr::Ident(String::from("bar")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Div, Expr::Ident(String::from("bar")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Rem, Expr::Ident(String::from("bar")))),
+        Instruction::EmptyLine,
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Sub, Expr::Const(42))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Const(413),                 BinaryOperator::Mul, Expr::Const(1111))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Div, Expr::Const(0x40))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Rem, Expr::Ident(String::from("bar")))),
+        Instruction::EmptyLine,
+        Instruction::JpI16 (Flag::Z, Expr::Ident (String::from("foo_bar"))),
+        Instruction::JpI16 (Flag::Z, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::Ident(String::from("bar")))),
+    ));
+}
+
+#[test]
+fn test_exprs_complex() {
+    let text = r#"
+    jp (foo + bar)
+    jp (foo + bar) + baz
+    jp foo + (bar + baz)
+    jp foo * (bar + baz)
+    jp (foo + bar) * baz
+    jp ((foo + bar) * baz)
+    ; TODO: Order of operations
+    ;jp foo + bar * baz
+    ;jp foo * bar + baz
+    ;jp foo / bar + baz
+    ;jp foo + bar / baz
+    ;jp foo % bar + baz
+    ;jp foo + bar % baz
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::Ident(String::from("bar")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::Ident(String::from("bar"))), BinaryOperator::Add, Expr::Ident(String::from("baz")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::binary(Expr::Ident(String::from("bar")), BinaryOperator::Add, Expr::Ident(String::from("baz"))))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Mul, Expr::binary(Expr::Ident(String::from("bar")), BinaryOperator::Add, Expr::Ident(String::from("baz"))))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::Ident(String::from("bar"))), BinaryOperator::Mul, Expr::Ident(String::from("baz")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::Ident(String::from("bar"))), BinaryOperator::Mul, Expr::Ident(String::from("baz")))),
+        // TODO: Order of operations
+        //Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::binary(Expr::Ident(String::from("bar")), BinaryOperator::Mul, Expr::Ident(String::from("baz"))))),
+        Instruction::EmptyLine,
+        Instruction::EmptyLine,
+        Instruction::EmptyLine,
+        Instruction::EmptyLine,
+        Instruction::EmptyLine,
+        Instruction::EmptyLine,
+        Instruction::EmptyLine,
     ));
 }
 

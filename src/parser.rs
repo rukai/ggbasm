@@ -6,7 +6,7 @@ use nom::types::CompleteStr;
 
 use crate::instruction::*;
 
-static IDENT: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_-";
+static IDENT: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_";
 static HEX:        &str = "1234567890ABCDEFabcdef";
 static DEC:        &str = "1234567890";
 static WHITESPACE: &str = " \t";
@@ -70,14 +70,37 @@ named!(parse_constant<CompleteStr, i64>,
     )
 );
 
+named!(parse_binary_operator<CompleteStr, BinaryOperator>,
+    alt!(
+        value!(BinaryOperator::Add, tag_no_case!("+")) |
+        value!(BinaryOperator::Sub, tag_no_case!("-")) |
+        value!(BinaryOperator::Mul, tag_no_case!("*")) |
+        value!(BinaryOperator::Div, tag_no_case!("/")) |
+        value!(BinaryOperator::Rem, tag_no_case!("%"))
+    )
+);
+
 fn u16_to_vec(input: u16) -> Vec<u8> {
     let mut result = vec!();
     result.write_u16::<LittleEndian>(input).unwrap();
     result
 }
 
-named!(parse_expr<CompleteStr, Expr>,
+// Pulled some of parse_expr into this parser to avoid infinite recursion on the left binary expr
+named!(parse_expr_no_recurse<CompleteStr, Expr>,
     alt!(
+        do_parse!(
+            tag_no_case!("(") >>
+            opt!(is_a!(WHITESPACE)) >>
+            left: parse_expr_no_recurse >>
+            opt!(is_a!(WHITESPACE)) >>
+            operator: parse_binary_operator >>
+            opt!(is_a!(WHITESPACE)) >>
+            right: parse_expr >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!(")") >>
+            (Expr::binary(left, operator, right))
+        ) |
         do_parse!(
             value: parse_constant >>
             (Expr::Const(value))
@@ -86,6 +109,20 @@ named!(parse_expr<CompleteStr, Expr>,
             ident: is_a!(IDENT) >>
             (Expr::Ident(ident.to_string()))
         )
+    )
+);
+
+named!(parse_expr<CompleteStr, Expr>,
+    alt!(
+        do_parse!(
+            left: parse_expr_no_recurse >>
+            opt!(is_a!(WHITESPACE)) >>
+            operator: parse_binary_operator >>
+            opt!(is_a!(WHITESPACE)) >>
+            right: parse_expr >>
+            (Expr::binary(left, operator, right))
+        ) |
+        parse_expr_no_recurse
     )
 );
 
@@ -318,15 +355,6 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
-            reg: parse_reg_u16 >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::LdR16I16 (reg, expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
             tag_no_case!("[") >>
             opt!(is_a!(WHITESPACE)) >>
             expr: parse_expr >>
@@ -427,32 +455,6 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
-            tag_no_case!("[") >>
-            opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("]") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("a") >>
-            end_line >>
-            (Instruction::LdMI16Ra (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("a") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("[") >>
-            opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("]") >>
-            end_line >>
-            (Instruction::LdRaMI16 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
             tag_no_case!("a") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("[") >>
@@ -530,6 +532,41 @@ named!(instruction<CompleteStr, Instruction>,
             expr: parse_expr >>
             end_line >>
             (Instruction::LdRhlRspI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("[") >>
+            opt!(is_a!(WHITESPACE)) >>
+            expr: parse_expr >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("]") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            end_line >>
+            (Instruction::LdMI16Ra (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("a") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("[") >>
+            opt!(is_a!(WHITESPACE)) >>
+            expr: parse_expr >>
+            opt!(is_a!(WHITESPACE)) >>
+            tag_no_case!("]") >>
+            end_line >>
+            (Instruction::LdRaMI16 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("ld") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u16 >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::LdR16I16 (reg, expr))
         ) |
         do_parse!(
             tag_no_case!("push") >>

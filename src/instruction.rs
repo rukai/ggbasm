@@ -14,17 +14,23 @@ pub enum Expr {
     Unary (Box<UnaryExpr>),
 }
 
+impl Expr {
+    pub fn binary(left: Expr, operator: BinaryOperator, right: Expr) -> Expr {
+        Expr::Binary (Box::new(BinaryExpr { left, operator, right }))
+    }
+}
+
 #[derive(PartialEq, Debug)]
 pub struct BinaryExpr {
-    left: Expr,
-    operator: BinaryOperator,
-    right: Expr,
+    pub left: Expr,
+    pub operator: BinaryOperator,
+    pub right: Expr,
 }
 
 #[derive(PartialEq, Debug)]
 pub struct UnaryExpr {
-    operator: UnaryOperator,
-    expr: Expr,
+    pub operator: UnaryOperator,
+    pub expr: Expr,
 }
 
 #[derive(PartialEq, Debug)]
