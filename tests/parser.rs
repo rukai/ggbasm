@@ -160,11 +160,11 @@ fn test_call() {
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
         Instruction::EmptyLine,
-        Instruction::Call (Flag::Z, Expr16::Ident(String::from("foobar"))),
-        Instruction::Call (Flag::NZ, Expr16::U16(0x1337)),
-        Instruction::Call (Flag::C, Expr16::U16(0)),
-        Instruction::Call (Flag::NC, Expr16::U16(42)),
-        Instruction::Call (Flag::Always, Expr16::U16(413)),
+        Instruction::Call (Flag::Z, Expr::Ident(String::from("foobar"))),
+        Instruction::Call (Flag::NZ, Expr::Const(0x1337)),
+        Instruction::Call (Flag::C, Expr::Const(0)),
+        Instruction::Call (Flag::NC, Expr::Const(42)),
+        Instruction::Call (Flag::Always, Expr::Const(413)),
     ));
 }
 
@@ -302,11 +302,11 @@ fn test_jp() {
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
         Instruction::EmptyLine,
-        Instruction::JpI16 (Flag::Always, Expr16::U16 (0x0150)),
-        Instruction::JpI16 (Flag::NZ,     Expr16::Ident (String::from("foo_bar"))),
-        Instruction::JpI16 (Flag::Z,      Expr16::U16 (413)),
-        Instruction::JpI16 (Flag::NC,     Expr16::U16 (1111)),
-        Instruction::JpI16 (Flag::C,      Expr16::U16 (42)),
+        Instruction::JpI16 (Flag::Always, Expr::Const (0x0150)),
+        Instruction::JpI16 (Flag::NZ,     Expr::Ident (String::from("foo_bar"))),
+        Instruction::JpI16 (Flag::Z,      Expr::Const (413)),
+        Instruction::JpI16 (Flag::NC,     Expr::Const (1111)),
+        Instruction::JpI16 (Flag::C,      Expr::Const (42)),
         Instruction::JpRhl,
     ));
 }
@@ -323,11 +323,11 @@ fn test_jr() {
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
         Instruction::EmptyLine,
-        Instruction::Jr (Flag::Always, Expr8::U8 (0x42)),
-        Instruction::Jr (Flag::NZ,     Expr8::Ident (String::from("foo_bar"))),
-        Instruction::Jr (Flag::Z,      Expr8::U8 (255)),
-        Instruction::Jr (Flag::NC,     Expr8::U8 (11)),
-        Instruction::Jr (Flag::C,      Expr8::U8 (42)),
+        Instruction::Jr (Flag::Always, Expr::Const (0x42)),
+        Instruction::Jr (Flag::NZ,     Expr::Ident (String::from("foo_bar"))),
+        Instruction::Jr (Flag::Z,      Expr::Const (255)),
+        Instruction::Jr (Flag::NC,     Expr::Const (11)),
+        Instruction::Jr (Flag::C,      Expr::Const (42)),
     ));
 }
 
@@ -567,25 +567,25 @@ fn test_ld() {
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
         Instruction::EmptyLine,
-        Instruction::LdR16I16 (Reg16::BC, Expr16::U16 (0x0413)),
-        Instruction::LdR16I16 (Reg16::BC, Expr16::Ident (String::from("something"))),
-        Instruction::LdR16I16 (Reg16::DE, Expr16::U16 (0x0413)),
-        Instruction::LdR16I16 (Reg16::HL, Expr16::U16 (0x0413)),
-        Instruction::LdR16I16 (Reg16::SP, Expr16::U16 (0x0413)),
+        Instruction::LdR16I16 (Reg16::BC, Expr::Const (0x0413)),
+        Instruction::LdR16I16 (Reg16::BC, Expr::Ident (String::from("something"))),
+        Instruction::LdR16I16 (Reg16::DE, Expr::Const (0x0413)),
+        Instruction::LdR16I16 (Reg16::HL, Expr::Const (0x0413)),
+        Instruction::LdR16I16 (Reg16::SP, Expr::Const (0x0413)),
         Instruction::EmptyLine,
-        Instruction::LdMI16Rsp (Expr16::U16 (0x3535)),
-        Instruction::LdMI16Rsp (Expr16::U16 (0x3535)),
-        Instruction::LdMI16Rsp (Expr16::U16 (0x3535)),
-        Instruction::LdMI16Rsp (Expr16::U16 (0x3535)),
-        Instruction::LdMI16Rsp (Expr16::U16 (0x3535)),
+        Instruction::LdMI16Rsp (Expr::Const (0x3535)),
+        Instruction::LdMI16Rsp (Expr::Const (0x3535)),
+        Instruction::LdMI16Rsp (Expr::Const (0x3535)),
+        Instruction::LdMI16Rsp (Expr::Const (0x3535)),
+        Instruction::LdMI16Rsp (Expr::Const (0x3535)),
         Instruction::EmptyLine,
-        Instruction::LdR8I8 (Reg8::A, Expr8::U8 (0xFF)),
-        Instruction::LdR8I8 (Reg8::B, Expr8::Ident (String::from("foo"))),
-        Instruction::LdR8I8 (Reg8::C, Expr8::U8 (0x10)),
-        Instruction::LdR8I8 (Reg8::D, Expr8::U8 (42)),
-        Instruction::LdR8I8 (Reg8::E, Expr8::U8 (42)),
-        Instruction::LdR8I8 (Reg8::H, Expr8::U8 (42)),
-        Instruction::LdR8I8 (Reg8::L, Expr8::U8 (42)),
+        Instruction::LdR8I8 (Reg8::A, Expr::Const (0xFF)),
+        Instruction::LdR8I8 (Reg8::B, Expr::Ident (String::from("foo"))),
+        Instruction::LdR8I8 (Reg8::C, Expr::Const (0x10)),
+        Instruction::LdR8I8 (Reg8::D, Expr::Const (42)),
+        Instruction::LdR8I8 (Reg8::E, Expr::Const (42)),
+        Instruction::LdR8I8 (Reg8::H, Expr::Const (42)),
+        Instruction::LdR8I8 (Reg8::L, Expr::Const (42)),
         Instruction::EmptyLine,
         Instruction::LdMRbcRa,
         Instruction::LdMRdeRa,
@@ -597,7 +597,7 @@ fn test_ld() {
         Instruction::LdiRaMRhl,
         Instruction::LddRaMRhl,
         Instruction::EmptyLine,
-        Instruction::LdMRhlI8 (Expr8::U8 (42)),
+        Instruction::LdMRhlI8 (Expr::Const (42)),
         Instruction::EmptyLine,
         Instruction::LdR8MRhl (Reg8::A),
         Instruction::LdR8MRhl (Reg8::B),
@@ -615,10 +615,10 @@ fn test_ld() {
         Instruction::LdMRhlR8 (Reg8::H),
         Instruction::LdMRhlR8 (Reg8::L),
         Instruction::EmptyLine,
-        Instruction::LdhMI8Ra (Expr8::U8 (42)),
-        Instruction::LdhMI8Ra (Expr8::U8 (42)),
-        Instruction::LdhRaMI8 (Expr8::U8 (42)),
-        Instruction::LdhRaMI8 (Expr8::U8 (42)),
+        Instruction::LdhMI8Ra (Expr::Const (42)),
+        Instruction::LdhMI8Ra (Expr::Const (42)),
+        Instruction::LdhRaMI8 (Expr::Const (42)),
+        Instruction::LdhRaMI8 (Expr::Const (42)),
         Instruction::EmptyLine,
         Instruction::LdhMRcRa,
         Instruction::LdhMRcRa,
@@ -626,11 +626,11 @@ fn test_ld() {
         Instruction::LdhRaMRc,
         Instruction::LdhRaMRc,
         Instruction::EmptyLine,
-        Instruction::LdRhlRspI8 (Expr8::U8 (13)),
-        Instruction::LdRhlRspI8 (Expr8::U8 (13)),
+        Instruction::LdRhlRspI8 (Expr::Const (13)),
+        Instruction::LdRhlRspI8 (Expr::Const (13)),
         Instruction::LdRspRhl,
-        Instruction::LdMI16Ra (Expr16::U16 (0x413)),
-        Instruction::LdRaMI16 (Expr16::U16 (0x413)),
+        Instruction::LdMI16Ra (Expr::Const (0x413)),
+        Instruction::LdRaMI16 (Expr::Const (0x413)),
     ));
 }
 

@@ -19,6 +19,7 @@ fn is_dec(input: char) -> bool {
     DEC.contains(input)
 }
 
+// TODO: Replace with parse_constant in db and dw, advance_address
 named!(parse_u8<CompleteStr, u8>,
     alt!(
         // hexadecimal
@@ -35,19 +36,7 @@ named!(parse_u8<CompleteStr, u8>,
     )
 );
 
-named!(parse_expr8<CompleteStr, Expr8>,
-    alt!(
-        do_parse!(
-            value: parse_u8 >>
-            (Expr8::U8(value))
-        ) |
-        do_parse!(
-            ident: is_a!(IDENT) >>
-            (Expr8::Ident(ident.to_string()))
-        )
-    )
-);
-
+// TODO: Replace with parse_constant in db and dw, advance_address
 named!(parse_u16<CompleteStr, u16>,
     alt!(
         // hexadecimal
@@ -64,21 +53,38 @@ named!(parse_u16<CompleteStr, u16>,
     )
 );
 
+
+named!(parse_constant<CompleteStr, i64>,
+    alt!(
+        // hexadecimal
+        do_parse!(
+            tag!("0x") >>
+            value: take_while_m_n!(1, 16, is_hex) >> // TODO: Make this endless, we should really handle all the num to big to parse errors in one case
+            (i64::from_str_radix(value.as_ref(), 16).unwrap())
+        ) |
+        // decimal
+        do_parse!(
+            value: take_while_m_n!(1, 20, is_dec) >> // TODO: Make this endless, we should really handle all the num to big to parse errors in one case
+            (i64::from_str_radix(value.as_ref(), 10).unwrap())
+        )
+    )
+);
+
 fn u16_to_vec(input: u16) -> Vec<u8> {
     let mut result = vec!();
     result.write_u16::<LittleEndian>(input).unwrap();
     result
 }
 
-named!(parse_expr16<CompleteStr, Expr16>,
+named!(parse_expr<CompleteStr, Expr>,
     alt!(
         do_parse!(
-            value: parse_u16 >>
-            (Expr16::U16(value))
+            value: parse_constant >>
+            (Expr::Const(value))
         ) |
         do_parse!(
             ident: is_a!(IDENT) >>
-            (Expr16::Ident(ident.to_string()))
+            (Expr::Ident(ident.to_string()))
         )
     )
 );
@@ -210,14 +216,14 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             flag: parse_flag >>
             is_a!(WHITESPACE) >>
-            expr: parse_expr16 >>
+            expr: parse_expr >>
             end_line >>
             (Instruction::Call (flag, expr))
         ) |
         do_parse!(
             tag_no_case!("call") >>
             is_a!(WHITESPACE) >>
-            expr: parse_expr16 >>
+            expr: parse_expr >>
             end_line >>
             (Instruction::Call (Flag::Always, expr))
         ) |
@@ -231,7 +237,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("jp") >>
             is_a!(WHITESPACE) >>
-            expr: parse_expr16 >>
+            expr: parse_expr >>
             end_line >>
             (Instruction::JpI16 (Flag::Always, expr))
         ) |
@@ -240,14 +246,14 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             flag: parse_flag >>
             is_a!(WHITESPACE) >>
-            expr: parse_expr16 >>
+            expr: parse_expr >>
             end_line >>
             (Instruction::JpI16 (flag, expr))
         ) |
         do_parse!(
             tag_no_case!("jr") >>
             is_a!(WHITESPACE) >>
-            expr: parse_expr8 >>
+            expr: parse_expr >>
             end_line >>
             (Instruction::Jr (Flag::Always, expr))
         ) |
@@ -256,7 +262,7 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             flag: parse_flag >>
             is_a!(WHITESPACE) >>
-            expr: parse_expr8 >>
+            expr: parse_expr >>
             end_line >>
             (Instruction::Jr (flag, expr))
         ) |
@@ -296,7 +302,7 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             reg1: parse_reg_u8 >>
             is_a!(WHITESPACE) >>
-            reg2: parse_expr8 >>
+            reg2: parse_expr >>
             end_line >>
             (Instruction::LdR8I8 (reg1, reg2))
         ) |
@@ -314,7 +320,7 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             reg: parse_reg_u16 >>
             is_a!(WHITESPACE) >>
-            expr: parse_expr16 >>
+            expr: parse_expr >>
             end_line >>
             (Instruction::LdR16I16 (reg, expr))
         ) |
@@ -323,7 +329,7 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             tag_no_case!("[") >>
             opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr16 >>
+            expr: parse_expr >>
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("]") >>
             is_a!(WHITESPACE) >>
@@ -405,7 +411,7 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             deref_hl >>
             is_a!(WHITESPACE) >>
-            expr: parse_expr8 >>
+            expr: parse_expr >>
             end_line >>
             (Instruction::LdMRhlI8 (expr))
         ) |
@@ -423,7 +429,7 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             tag_no_case!("[") >>
             opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr16 >>
+            expr: parse_expr >>
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("]") >>
             is_a!(WHITESPACE) >>
@@ -438,7 +444,7 @@ named!(instruction<CompleteStr, Instruction>,
             is_a!(WHITESPACE) >>
             tag_no_case!("[") >>
             opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr16 >>
+            expr: parse_expr >>
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("]") >>
             end_line >>
@@ -487,7 +493,7 @@ named!(instruction<CompleteStr, Instruction>,
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("+") >>
             opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr8 >>
+            expr: parse_expr >>
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("]") >>
             is_a!(WHITESPACE) >>
@@ -506,7 +512,7 @@ named!(instruction<CompleteStr, Instruction>,
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("+") >>
             opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr8 >>
+            expr: parse_expr >>
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("]") >>
             end_line >>
@@ -521,7 +527,7 @@ named!(instruction<CompleteStr, Instruction>,
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("+") >>
             opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr8 >>
+            expr: parse_expr >>
             end_line >>
             (Instruction::LdRhlRspI8 (expr))
         ) |

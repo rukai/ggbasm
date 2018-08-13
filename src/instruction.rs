@@ -7,55 +7,116 @@ use byteorder::{LittleEndian, ByteOrder};
 use crate::constants::*;
 
 #[derive(PartialEq, Debug)]
-pub enum Expr8 {
+pub enum Expr {
     Ident (String),
-    U8 (u8),
-}
-
-impl Expr8 {
-    pub fn get_byte(&self, ident_to_address: &HashMap<String, u32>) -> Result<u8, Error> {
-        match self {
-            Expr8::Ident (ident) => {
-                match ident_to_address.get(ident) {
-                    Some(address) => {
-                        if *address >= 0xFF {
-                            bail!("Identifier {} contains 0x{:x} but expected 8 bit value")
-                        }
-                        Ok(*address as u8)
-                    }
-                    None => bail!("Identifier {} can not be found", ident)
-                }
-            }
-            Expr8::U8 (value) => Ok(*value),
-        }
-    }
+    Const (i64),
+    Binary (Box<BinaryExpr>),
+    Unary (Box<UnaryExpr>),
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Expr16 {
-    Ident (String),
-    U16 (u16),
+pub struct BinaryExpr {
+    left: Expr,
+    operator: BinaryOperator,
+    right: Expr,
 }
 
-impl Expr16 {
-    pub fn get_bytes(&self, ident_to_address: &HashMap<String, u32>) -> Result<[u8; 2], Error> {
-        let value = match self {
-            Expr16::Ident (ident) => {
+#[derive(PartialEq, Debug)]
+pub struct UnaryExpr {
+    operator: UnaryOperator,
+    expr: Expr,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum BinaryOperator {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum UnaryOperator {
+    Minus,
+}
+
+impl Expr {
+    pub fn get_2bytes(&self, ident_to_address: &HashMap<String, u32>) -> Result<[u8; 2], Error> {
+        let mut result = [0, 0];
+        LittleEndian::write_u16(&mut result, self.run(ident_to_address)? as u16);
+        Ok(result)
+    }
+
+    pub fn get_byte(&self, ident_to_address: &HashMap<String, u32>) -> Result<u8, Error> {
+        Ok(self.run(ident_to_address)? as u8)
+    }
+
+    fn run(&self, ident_to_address: &HashMap<String, u32>) -> Result<i64, Error> {
+        Ok(match self {
+            Expr::Ident (ident) => {
                 match ident_to_address.get(ident) {
                     Some(address) => {
-                        if *address >= 0xFFFF {
-                            bail!("Identifier {} contains 0x{:x} but expected 16 bit value")
-                        }
-                        *address as u16
+                        *address as i64
                     }
                     None => bail!("Identifier {} can not be found", ident)
                 }
             }
-            Expr16::U16 (value) => *value,
-        };
-        let mut result = [0, 0];
-        LittleEndian::write_u16(&mut result, value);
-        Ok(result)
+            Expr::Const (value) => *value,
+            Expr::Binary (binary) => {
+                let left = binary.left.run(ident_to_address)?;
+                let right = binary.left.run(ident_to_address)?;
+                match binary.operator {
+                    BinaryOperator::Add => {
+                        match left.checked_add(right) {
+                            Some(value) => value,
+                            None        => bail!("Addition overflowed: {:?} + {:?}", binary.left, binary.right)
+                        }
+                    }
+                    BinaryOperator::Sub => {
+                        match left.checked_sub(right) {
+                            Some(value) => value,
+                            None        => bail!("Subtraction underflowed: {:?} - {:?}", binary.left, binary.right)
+                        }
+                    }
+                    BinaryOperator::Mul => {
+                        match left.checked_mul(right) {
+                            Some(value) => value,
+                            None        => bail!("Multiplication overflowed: {:?} * {:?}", binary.left, binary.right)
+                        }
+                    }
+                    BinaryOperator::Div => {
+                        if right == 0 {
+                            bail!("Attempted to divide by zero: {:?} / {:?}", binary.left, binary.right)
+                        }
+                        match left.checked_div(right) {
+                            Some(value) => value,
+                            None        => bail!("Division overflowed: {:?} / {:?}", binary.left, binary.right)
+                        }
+                    }
+                    BinaryOperator::Rem => {
+                        if right == 0 {
+                            bail!("Attempted to divide by zero (remainder): {:?} % {:?}", binary.left, binary.right)
+                        }
+                        match left.checked_div(right) {
+                            Some(value) => value,
+                            None        => bail!("Remainder overflowed: {:?} % {:?}", binary.left, binary.right)
+                        }
+                    }
+                }
+            }
+            Expr::Unary (unary) => {
+                match unary.operator {
+                    UnaryOperator::Minus => {
+                        let value = unary.expr.run(ident_to_address)?;
+                        match value.checked_neg() {
+                            Some(value) => value,
+                            None        => bail!("Failed to get negative value of: {}", value)
+                        }
+                    }
+                }
+            }
+        })
     }
 }
 
@@ -120,38 +181,38 @@ pub enum Instruction {
     Ei,
     Ret (Flag),
     Reti,
-    Call  (Flag, Expr16),
-    JpI16 (Flag, Expr16),
+    Call  (Flag, Expr),
+    JpI16 (Flag, Expr),
     JpRhl,
-    Jr (Flag, Expr8),
+    Jr (Flag, Expr),
     IncR16 (Reg16),
     IncR8  (Reg8),
     IncMRhl,
     DecR16 (Reg16),
     DecR8  (Reg8),
     DecMRhl,
-    LdR16I16 (Reg16, Expr16),
-    LdMI16Rsp (Expr16),
+    LdR16I16 (Reg16, Expr),
+    LdMI16Rsp (Expr),
     LdMRbcRa,
     LdMRdeRa,
     LdRaMRbc,
     LdRaMRde,
     LdR8R8  (Reg8, Reg8),
-    LdR8I8  (Reg8, Expr8),
+    LdR8I8  (Reg8, Expr),
     LdR8MRhl (Reg8),
     LdMRhlR8 (Reg8),
-    LdMRhlI8 (Expr8),
-    LdMI16Ra (Expr16),
-    LdRaMI16 (Expr16),
-    LdhRaMI8 (Expr8),
-    LdhMI8Ra (Expr8),
+    LdMRhlI8 (Expr),
+    LdMI16Ra (Expr),
+    LdRaMI16 (Expr),
+    LdhRaMI8 (Expr),
+    LdhMI8Ra (Expr),
     LdhRaMRc,
     LdhMRcRa,
     LdiMRhlRa,
     LddMRhlRa,
     LdiRaMRhl,
     LddRaMRhl,
-    LdRhlRspI8 (Expr8),
+    LdRhlRspI8 (Expr),
     LdRspRhl,
     Push (Reg16Push),
     Pop  (Reg16Push),
@@ -196,7 +257,7 @@ impl Instruction {
                     Flag::NZ     => rom.push(0xC4),
                     Flag::NC     => rom.push(0xD4),
                 }
-                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
             }
             Instruction::JpI16 (flag, expr) => {
                 match flag {
@@ -206,7 +267,7 @@ impl Instruction {
                     Flag::NZ     => rom.push(0xC2),
                     Flag::NC     => rom.push(0xD2),
                 }
-                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
             }
             Instruction::JpRhl => rom.push(0xE9),
             Instruction::Jr (flag, expr) => {
@@ -266,11 +327,11 @@ impl Instruction {
                     Reg16::HL => rom.push(0x21),
                     Reg16::SP => rom.push(0x31),
                 }
-                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
             }
             Instruction::LdMI16Rsp (expr) => {
                 rom.push(0x08);
-                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
             }
             Instruction::LdR8I8 (reg, expr) => {
                 match reg {
@@ -342,11 +403,11 @@ impl Instruction {
             }
             Instruction::LdMI16Ra (expr) => {
                 rom.push(0xEA);
-                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
             }
             Instruction::LdRaMI16 (expr) => {
                 rom.push(0xFA);
-                rom.extend(expr.get_bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
             }
             Instruction::LdhRaMI8 (expr) => {
                 rom.push(0xF0);
