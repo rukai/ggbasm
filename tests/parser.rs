@@ -245,6 +245,20 @@ fn test_call() {
 }
 
 #[test]
+fn test_equ() {
+    let text = r#"
+    foo equ bar
+    bar EQU 0xFF
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::Equ (String::from("foo"), Expr::Ident(String::from("bar"))),
+        Instruction::Equ (String::from("bar"), Expr::Const(0xFF)),
+    ));
+}
+
+#[test]
 fn test_db() {
     let text = r#"
     db 0

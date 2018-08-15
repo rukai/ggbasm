@@ -197,6 +197,17 @@ named!(instruction<CompleteStr, Instruction>,
             (Instruction::Label (label.to_string()))
         ) |
 
+        // equ
+        do_parse!(
+            label: is_a!(IDENT) >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("EQU") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::Equ (label.to_string(), expr))
+        ) |
+
         // direct bytes
         do_parse!(
             tag_no_case!("db") >>

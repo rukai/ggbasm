@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use failure::Error;
-use failure::bail;
+use failure::Fail;
 use byteorder::{LittleEndian, ByteOrder};
 
 use crate::constants::*;
@@ -48,65 +48,67 @@ pub enum UnaryOperator {
 }
 
 impl Expr {
-    pub fn get_2bytes(&self, ident_to_address: &HashMap<String, u32>) -> Result<[u8; 2], Error> {
+    pub fn get_2bytes(&self, constants: &HashMap<String, i64>) -> Result<[u8; 2], ExprRunError> {
         let mut result = [0, 0];
-        LittleEndian::write_u16(&mut result, self.run(ident_to_address)? as u16);
+        LittleEndian::write_u16(&mut result, self.run(constants)? as u16);
         Ok(result)
     }
 
-    pub fn get_byte(&self, ident_to_address: &HashMap<String, u32>) -> Result<u8, Error> {
-        Ok(self.run(ident_to_address)? as u8)
+    pub fn get_byte(&self, constants: &HashMap<String, i64>) -> Result<u8, ExprRunError> {
+        Ok(self.run(constants)? as u8)
     }
 
-    fn run(&self, ident_to_address: &HashMap<String, u32>) -> Result<i64, Error> {
-        Ok(match self {
+    pub fn run(&self, constants: &HashMap<String, i64>) -> Result<i64, ExprRunError> {
+        match self {
             Expr::Ident (ident) => {
-                match ident_to_address.get(ident) {
+                match constants.get(ident) {
                     Some(address) => {
-                        *address as i64
+                        Ok(*address as i64)
                     }
-                    None => bail!("Identifier {} can not be found", ident)
+                    None => Err(ExprRunError::MissingIdentifier (ident.clone()))
                 }
             }
-            Expr::Const (value) => *value,
+            Expr::Const (value) => Ok(*value),
             Expr::Binary (binary) => {
-                let left = binary.left.run(ident_to_address)?;
-                let right = binary.left.run(ident_to_address)?;
+                let left = binary.left.run(constants)?;
+                let right = binary.right.run(constants)?;
                 match binary.operator {
                     BinaryOperator::Add => {
                         match left.checked_add(right) {
-                            Some(value) => value,
-                            None        => bail!("Addition overflowed: {:?} + {:?}", binary.left, binary.right)
+                            Some(value) => Ok(value),
+                            None        => Err(ExprRunError::ArithmeticError (format!("Addition overflowed: {:?} + {:?}", binary.left, binary.right)))
                         }
                     }
                     BinaryOperator::Sub => {
                         match left.checked_sub(right) {
-                            Some(value) => value,
-                            None        => bail!("Subtraction underflowed: {:?} - {:?}", binary.left, binary.right)
+                            Some(value) => Ok(value),
+                            None        => Err(ExprRunError::ArithmeticError (format!("Subtraction underflowed: {:?} - {:?}", binary.left, binary.right)))
                         }
                     }
                     BinaryOperator::Mul => {
                         match left.checked_mul(right) {
-                            Some(value) => value,
-                            None        => bail!("Multiplication overflowed: {:?} * {:?}", binary.left, binary.right)
+                            Some(value) => Ok(value),
+                            None        => Err(ExprRunError::ArithmeticError (format!("Multiplication overflowed: {:?} * {:?}", binary.left, binary.right)))
                         }
                     }
                     BinaryOperator::Div => {
                         if right == 0 {
-                            bail!("Attempted to divide by zero: {:?} / {:?}", binary.left, binary.right)
-                        }
-                        match left.checked_div(right) {
-                            Some(value) => value,
-                            None        => bail!("Division overflowed: {:?} / {:?}", binary.left, binary.right)
+                            Err(ExprRunError::ArithmeticError (format!("Attempted to divide by zero: {:?} / {:?}", binary.left, binary.right)))
+                        } else {
+                            match left.checked_div(right) {
+                                Some(value) => Ok(value),
+                                None        => Err(ExprRunError::ArithmeticError (format!("Division overflowed: {:?} / {:?}", binary.left, binary.right)))
+                            }
                         }
                     }
                     BinaryOperator::Rem => {
                         if right == 0 {
-                            bail!("Attempted to divide by zero (remainder): {:?} % {:?}", binary.left, binary.right)
-                        }
-                        match left.checked_div(right) {
-                            Some(value) => value,
-                            None        => bail!("Remainder overflowed: {:?} % {:?}", binary.left, binary.right)
+                            Err(ExprRunError::ArithmeticError (format!("Attempted to divide by zero (remainder): {:?} % {:?}", binary.left, binary.right)))
+                        } else {
+                            match left.checked_div(right) {
+                                Some(value) => Ok(value),
+                                None        => Err(ExprRunError::ArithmeticError (format!("Remainder overflowed: {:?} % {:?}", binary.left, binary.right)))
+                            }
                         }
                     }
                 }
@@ -114,16 +116,24 @@ impl Expr {
             Expr::Unary (unary) => {
                 match unary.operator {
                     UnaryOperator::Minus => {
-                        let value = unary.expr.run(ident_to_address)?;
+                        let value = unary.expr.run(constants)?;
                         match value.checked_neg() {
-                            Some(value) => value,
-                            None        => bail!("Failed to get negative value of: {}", value)
+                            Some(value) => Ok(value),
+                            None        => Err(ExprRunError::ArithmeticError (format!("Failed to get negative value of: {}", value)))
                         }
                     }
                 }
             }
-        })
+        }
     }
+}
+
+#[derive(Debug, Fail)]
+pub enum ExprRunError {
+    #[fail(display = "Identifier {} can not be found.", _0)]
+    MissingIdentifier (String),
+    #[fail(display = "Arithmetic error: {}", _0)]
+    ArithmeticError (String)
 }
 
 #[derive(PartialEq, Debug)]
@@ -178,6 +188,7 @@ pub enum Instruction {
     EmptyLine, // TODO: Combine this and the Option returned by the parser into a new enum
     /// the address within the current ROM bank
     AdvanceAddress (u16),
+    Equ (String, Expr),
     Label (String),
     Db (Vec<u8>),
     Nop,
@@ -226,9 +237,9 @@ pub enum Instruction {
 
 impl Instruction {
     /// Writes the instructions bytes to the passed rom
-    /// If an expr in the instruction uses an identifier than it looks up the value for it in ident_to_address
-    /// Will return Err if ident_to_address doesnt contain the required label
-    pub fn write_to_rom(&self, rom: &mut Vec<u8>, ident_to_address: &HashMap<String, u32>) -> Result<(), Error> {
+    /// If an expr in the instruction uses an identifier than it looks up the value for it in constants
+    /// Will return Err if constants doesnt contain the required label
+    pub fn write_to_rom(&self, rom: &mut Vec<u8>, constants: &HashMap<String, i64>) -> Result<(), Error> {
         match self {
             Instruction::AdvanceAddress (advance_address) => {
                 let address_bank = (rom.len() as u32 % ROM_BANK_SIZE) as u16;
@@ -238,6 +249,7 @@ impl Instruction {
                 }
             }
             Instruction::EmptyLine  => { }
+            Instruction::Equ (_,_)  => { }
             Instruction::Label (_)  => { }
             Instruction::Db (bytes) => rom.extend(bytes.iter()),
             Instruction::Nop        => rom.push(0x00),
@@ -246,7 +258,7 @@ impl Instruction {
             Instruction::Di         => rom.push(0xF3),
             Instruction::Ei         => rom.push(0xFB),
             Instruction::Reti       => rom.push(0xD9),
-            Instruction::Ret (flag)  => {
+            Instruction::Ret (flag) => {
                 match flag {
                     Flag::Always => rom.push(0xC9),
                     Flag::Z      => rom.push(0xC8),
@@ -263,7 +275,7 @@ impl Instruction {
                     Flag::NZ     => rom.push(0xC4),
                     Flag::NC     => rom.push(0xD4),
                 }
-                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(constants)?.iter());
             }
             Instruction::JpI16 (flag, expr) => {
                 match flag {
@@ -273,7 +285,7 @@ impl Instruction {
                     Flag::NZ     => rom.push(0xC2),
                     Flag::NC     => rom.push(0xD2),
                 }
-                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(constants)?.iter());
             }
             Instruction::JpRhl => rom.push(0xE9),
             Instruction::Jr (flag, expr) => {
@@ -284,7 +296,7 @@ impl Instruction {
                     Flag::NZ     => rom.push(0x20),
                     Flag::NC     => rom.push(0x30),
                 }
-                rom.push(expr.get_byte(ident_to_address)?);
+                rom.push(expr.get_byte(constants)?);
             }
             Instruction::IncR16 (reg) => {
                 match reg {
@@ -333,11 +345,11 @@ impl Instruction {
                     Reg16::HL => rom.push(0x21),
                     Reg16::SP => rom.push(0x31),
                 }
-                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(constants)?.iter());
             }
             Instruction::LdMI16Rsp (expr) => {
                 rom.push(0x08);
-                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(constants)?.iter());
             }
             Instruction::LdR8I8 (reg, expr) => {
                 match reg {
@@ -349,7 +361,7 @@ impl Instruction {
                     Reg8::H => rom.push(0x26),
                     Reg8::L => rom.push(0x2E),
                 }
-                rom.push(expr.get_byte(ident_to_address)?);
+                rom.push(expr.get_byte(constants)?);
             }
             Instruction::LdR8R8 (reg_in, reg_out) => {
                 let mut byte = 0;
@@ -405,23 +417,23 @@ impl Instruction {
             }
             Instruction::LdMRhlI8 (expr) => {
                 rom.push(0x36);
-                rom.push(expr.get_byte(ident_to_address)?);
+                rom.push(expr.get_byte(constants)?);
             }
             Instruction::LdMI16Ra (expr) => {
                 rom.push(0xEA);
-                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(constants)?.iter());
             }
             Instruction::LdRaMI16 (expr) => {
                 rom.push(0xFA);
-                rom.extend(expr.get_2bytes(ident_to_address)?.iter());
+                rom.extend(expr.get_2bytes(constants)?.iter());
             }
             Instruction::LdhRaMI8 (expr) => {
                 rom.push(0xF0);
-                rom.push(expr.get_byte(ident_to_address)?);
+                rom.push(expr.get_byte(constants)?);
             }
             Instruction::LdhMI8Ra (expr) => {
                 rom.push(0xE0);
-                rom.push(expr.get_byte(ident_to_address)?);
+                rom.push(expr.get_byte(constants)?);
             }
             Instruction::LdhRaMRc  => rom.push(0xF2),
             Instruction::LdhMRcRa  => rom.push(0xE2),
@@ -432,7 +444,7 @@ impl Instruction {
             Instruction::LdRspRhl  => rom.push(0xF9),
             Instruction::LdRhlRspI8 (expr) => {
                 rom.push(0xF8);
-                rom.push(expr.get_byte(ident_to_address)?);
+                rom.push(expr.get_byte(constants)?);
             }
             Instruction::Push (reg) => {
                 match reg {
@@ -459,6 +471,7 @@ impl Instruction {
         match self {
             Instruction::AdvanceAddress (advance_address) => advance_address - start_address,
             Instruction::EmptyLine       => 0,
+            Instruction::Equ (_,_)       => 0,
             Instruction::Label (_)       => 0,
             Instruction::Db (bytes)      => bytes.len() as u16,
             Instruction::Nop             => 1,
