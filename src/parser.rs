@@ -76,7 +76,10 @@ named!(parse_binary_operator<CompleteStr, BinaryOperator>,
         value!(BinaryOperator::Sub, tag_no_case!("-")) |
         value!(BinaryOperator::Mul, tag_no_case!("*")) |
         value!(BinaryOperator::Div, tag_no_case!("/")) |
-        value!(BinaryOperator::Rem, tag_no_case!("%"))
+        value!(BinaryOperator::Rem, tag_no_case!("%")) |
+        value!(BinaryOperator::And, tag_no_case!("&")) |
+        value!(BinaryOperator::Or,  tag_no_case!("|")) |
+        value!(BinaryOperator::Xor, tag_no_case!("^"))
     )
 );
 

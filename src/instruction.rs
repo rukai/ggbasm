@@ -40,6 +40,9 @@ pub enum BinaryOperator {
     Mul,
     Div,
     Rem,
+    And,
+    Xor,
+    Or,
 }
 
 #[derive(PartialEq, Debug)]
@@ -111,6 +114,9 @@ impl Expr {
                             }
                         }
                     }
+                    BinaryOperator::And => { Ok(left & right) }
+                    BinaryOperator::Or  => { Ok(left | right) }
+                    BinaryOperator::Xor => { Ok(left ^ right) }
                 }
             }
             Expr::Unary (unary) => {

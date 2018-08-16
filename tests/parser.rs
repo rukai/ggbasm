@@ -135,6 +135,9 @@ fn test_exprs_simple() {
     jp foo * bar
     jp foo / bar
     jp foo % bar
+    jp foo & bar
+    jp foo | bar
+    jp foo ^ bar
 
     jp foo-42
     jp 413*1111
@@ -153,6 +156,9 @@ fn test_exprs_simple() {
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Mul, Expr::Ident(String::from("bar")))),
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Div, Expr::Ident(String::from("bar")))),
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Rem, Expr::Ident(String::from("bar")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::And, Expr::Ident(String::from("bar")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Or,  Expr::Ident(String::from("bar")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Xor, Expr::Ident(String::from("bar")))),
         Instruction::EmptyLine,
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Sub, Expr::Const(42))),
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Const(413),                 BinaryOperator::Mul, Expr::Const(1111))),
