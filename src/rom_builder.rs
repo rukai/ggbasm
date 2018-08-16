@@ -143,6 +143,36 @@ impl RomBuilder {
         }
     }
 
+    /// Includes graphics bytes in the rom generated from the provided aseprite image file.
+    /// The name is used to reference the address in assembly code.
+    /// Returns an error if crosses rom bank boundaries
+    /// TODO: This is a stub method, its not actually implemented yet.
+    pub fn add_ase(mut self, _file_name: &str, identifier: &str) -> Result<Self, Error> {
+        let identifier = String::from(identifier);
+        if let Some(_) = self.constants.insert(identifier.to_string(), self.address as i64) {
+            // TODO: Display first usage
+            bail!("Identifier {} is already used", identifier)
+        }
+
+        // TODO: Actually process the *.ase file into bytes
+        let bytes = vec!(0xac, 0xea, 0xce, 0x00);
+        let size = bytes.len();
+
+        self.data.push(DataHolder {
+            data:    Data::Binary { bytes, identifier },
+            address: self.address,
+            source:  DataSource::Code,
+        });
+
+        let prev_bank = self.get_bank();
+        self.address += size as u32;
+        if prev_bank == self.get_bank() {
+            Ok(self)
+        } else {
+            bail!("The added bytes cross bank boundaries.");
+        }
+    }
+
     /// This function is used to include a *.asm file from the gbasm folder.
     /// Returns an error if crosses rom bank boundaries.
     /// Returns an error if encounters file system issues.
