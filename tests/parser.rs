@@ -897,7 +897,6 @@ fn test_cp() {
     ));
 }
 
-
 #[test]
 fn test_ld_r8_r8() {
     let text = r#"
@@ -1005,6 +1004,7 @@ fn test_ld_r8_r8() {
         Instruction::LdR8R8 (Reg8::L, Reg8::L),
     ));
 }
+
 #[test]
 fn test_ld() {
     let text = r#"
@@ -1166,5 +1166,83 @@ fn test_push_pop() {
         Instruction::Pop  (Reg16Push::DE),
         Instruction::Pop  (Reg16Push::HL),
         Instruction::Pop  (Reg16Push::AF),
+    ));
+}
+
+#[test]
+fn test_bit_bit_r8() {
+    let text = r#"
+    bit 2 a
+    bit 2 b
+    bit 2 c
+    bit 2 d
+    bit 2 e
+    bit 2 h
+    bit 2 l
+    bit 2 [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::BitBitR8   (Expr::Const(2), Reg8::A),
+        Instruction::BitBitR8   (Expr::Const(2), Reg8::B),
+        Instruction::BitBitR8   (Expr::Const(2), Reg8::C),
+        Instruction::BitBitR8   (Expr::Const(2), Reg8::D),
+        Instruction::BitBitR8   (Expr::Const(2), Reg8::E),
+        Instruction::BitBitR8   (Expr::Const(2), Reg8::H),
+        Instruction::BitBitR8   (Expr::Const(2), Reg8::L),
+        Instruction::BitBitMRhl (Expr::Const(2)),
+    ));
+}
+
+#[test]
+fn test_res_bit_r8() {
+    let text = r#"
+    res 2 a
+    res 2 b
+    res 2 c
+    res 2 d
+    res 2 e
+    res 2 h
+    res 2 l
+    res 2 [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::ResBitR8   (Expr::Const(2), Reg8::A),
+        Instruction::ResBitR8   (Expr::Const(2), Reg8::B),
+        Instruction::ResBitR8   (Expr::Const(2), Reg8::C),
+        Instruction::ResBitR8   (Expr::Const(2), Reg8::D),
+        Instruction::ResBitR8   (Expr::Const(2), Reg8::E),
+        Instruction::ResBitR8   (Expr::Const(2), Reg8::H),
+        Instruction::ResBitR8   (Expr::Const(2), Reg8::L),
+        Instruction::ResBitMRhl (Expr::Const(2)),
+    ));
+}
+
+#[test]
+fn test_set_bit_r8() {
+    let text = r#"
+    set 2 a
+    set 2 b
+    set 2 c
+    set 2 d
+    set 2 e
+    set 2 h
+    set 2 l
+    set 2 [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::SetBitR8   (Expr::Const(2), Reg8::A),
+        Instruction::SetBitR8   (Expr::Const(2), Reg8::B),
+        Instruction::SetBitR8   (Expr::Const(2), Reg8::C),
+        Instruction::SetBitR8   (Expr::Const(2), Reg8::D),
+        Instruction::SetBitR8   (Expr::Const(2), Reg8::E),
+        Instruction::SetBitR8   (Expr::Const(2), Reg8::H),
+        Instruction::SetBitR8   (Expr::Const(2), Reg8::L),
+        Instruction::SetBitMRhl (Expr::Const(2)),
     ));
 }

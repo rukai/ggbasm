@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use failure::Error;
-use failure::Fail;
+use failure::{Error, Fail, bail};
 use byteorder::{LittleEndian, ByteOrder};
 
 use crate::constants::*;
@@ -59,6 +58,14 @@ impl Expr {
 
     pub fn get_byte(&self, constants: &HashMap<String, i64>) -> Result<u8, ExprRunError> {
         Ok(self.run(constants)? as u8)
+    }
+
+    pub fn get_bit_index(&self, constants: &HashMap<String, i64>) -> Result<u8, Error> {
+        let value = self.run(constants)?;
+        if value > 7 {
+            bail!("bit is > 7");
+        }
+        Ok(value as u8)
     }
 
     pub fn run(&self, constants: &HashMap<String, i64>) -> Result<i64, ExprRunError> {
@@ -179,15 +186,16 @@ pub enum Flag {
 }
 
 /// Key:
-/// R16 - 16 bit register
-/// R8  - 8 bit register
-/// Rhl - the hl register
-/// Ra  - the a register
+/// R16  - 16 bit register
+/// R8   - 8 bit register
+/// Rhl  - the hl register
+/// Ra   - the a register
 /// MR16 - 8 bit value in memory pointed at by a 16 bit register
 /// MRhl - 8 bit value in memory pointed at by the HL register
-/// MRc - 8 bit value in memory pointed at by 0xFF + the register C
-/// I8  - immediate 8 bit value
-/// I16 - immediate 16 bit value
+/// MRc  - 8 bit value in memory pointed at by 0xFF + the register C
+/// I8   - immediate 8 bit value
+/// I16  - immediate 16 bit value
+/// Bit  - an index to a bit
 #[derive(PartialEq, Debug)]
 pub enum Instruction {
     /// Keeping track of empty lines makes it easier to refer errors back to a line number
@@ -273,6 +281,12 @@ pub enum Instruction {
     LdRspRhl,
     Push (Reg16Push),
     Pop  (Reg16Push),
+    BitBitR8 (Expr, Reg8),
+    BitBitMRhl (Expr),
+    ResBitR8 (Expr, Reg8),
+    ResBitMRhl (Expr),
+    SetBitR8 (Expr, Reg8),
+    SetBitMRhl (Expr),
 }
 
 impl Instruction {
@@ -565,15 +579,7 @@ impl Instruction {
                 };
 
                 // last 3 bits
-                byte |= match reg_out {
-                    Reg8::A => 0x07,
-                    Reg8::B => 0x00,
-                    Reg8::C => 0x01,
-                    Reg8::D => 0x02,
-                    Reg8::E => 0x03,
-                    Reg8::H => 0x04,
-                    Reg8::L => 0x05,
-                };
+                byte |= Instruction::reg8_to_bits(&reg_out);
 
                 rom.push(byte);
             }
@@ -650,8 +656,53 @@ impl Instruction {
                     Reg16Push::AF => rom.push(0xF1),
                 }
             }
+            Instruction::BitBitR8 (expr, reg) => {
+                rom.push(0xCB);
+                let byte = 0x40                                    // 0b11000000
+                         | (expr.get_bit_index(constants)? * 0x08) // 0b00111000
+                         | Instruction::reg8_to_bits(&reg);        // 0b00000111
+                rom.push(byte);
+            }
+            Instruction::BitBitMRhl (expr) => {
+                rom.push(0xCB);
+                rom.push(0x46 + expr.get_bit_index(constants)? * 0x08);
+            }
+            Instruction::ResBitR8 (expr, reg) => {
+                rom.push(0xCB);
+                let byte = 0x80                                    // 0b11000000
+                         | (expr.get_bit_index(constants)? * 0x08) // 0b00111000
+                         | Instruction::reg8_to_bits(&reg);        // 0b00000111
+                rom.push(byte)
+            }
+            Instruction::ResBitMRhl (expr) => {
+                rom.push(0xCB);
+                rom.push(0x86 + expr.get_bit_index(constants)? * 0x08);
+            }
+            Instruction::SetBitR8 (expr, reg) => {
+                rom.push(0xCB);
+                let byte = 0xC0                                    // 0b11000000
+                         | (expr.get_bit_index(constants)? * 0x08) // 0b00111000
+                         | Instruction::reg8_to_bits(&reg);        // 0b00000111
+                rom.push(byte)
+            }
+            Instruction::SetBitMRhl (expr) => {
+                rom.push(0xCB);
+                rom.push(0xC6 + expr.get_bit_index(constants)? * 0x08);
+            }
         }
         Ok(())
+    }
+
+    fn reg8_to_bits(reg: &Reg8) -> u8 {
+        match reg {
+            Reg8::A => 0x07,
+            Reg8::B => 0x00,
+            Reg8::C => 0x01,
+            Reg8::D => 0x02,
+            Reg8::E => 0x03,
+            Reg8::H => 0x04,
+            Reg8::L => 0x05,
+        }
     }
 
     /// Returns how many bytes the instruction takes up
@@ -738,6 +789,12 @@ impl Instruction {
             Instruction::LdRspRhl        => 1,
             Instruction::Push (_)        => 1,
             Instruction::Pop  (_)        => 1,
+            Instruction::BitBitR8 (_, _) => 2,
+            Instruction::BitBitMRhl (_)  => 2,
+            Instruction::ResBitR8 (_, _) => 2,
+            Instruction::ResBitMRhl (_)  => 2,
+            Instruction::SetBitR8 (_, _)   => 2,
+            Instruction::SetBitMRhl (_)    => 2,
         }
     }
 }

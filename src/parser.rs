@@ -824,6 +824,60 @@ named!(instruction<CompleteStr, Instruction>,
             end_line >>
             (Instruction::Pop (reg))
         ) |
+        do_parse!(
+            tag_no_case!("bit") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::BitBitR8 (expr, reg))
+        ) |
+        do_parse!(
+            tag_no_case!("bit") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::BitBitMRhl (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("res") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::ResBitR8 (expr, reg))
+        ) |
+        do_parse!(
+            tag_no_case!("res") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::ResBitMRhl (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("set") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::SetBitR8 (expr, reg))
+        ) |
+        do_parse!(
+            tag_no_case!("set") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::SetBitMRhl (expr))
+        ) |
 
         // line containing only whitespace/empty
         value!(Instruction::EmptyLine, end_line)
