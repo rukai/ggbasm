@@ -514,6 +514,16 @@ fn test_add() {
     add h
     add l
 
+    add a 0xFF
+    add a [hl]
+    add a a
+    add a b
+    add a c
+    add a d
+    add a e
+    add a h
+    add a l
+
     add hl bc
     add hl de
     add hl hl
@@ -522,6 +532,16 @@ fn test_add() {
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::AddI8 (Expr::Const(0xFF)),
+        Instruction::AddMRhl,
+        Instruction::AddR8 (Reg8::A),
+        Instruction::AddR8 (Reg8::B),
+        Instruction::AddR8 (Reg8::C),
+        Instruction::AddR8 (Reg8::D),
+        Instruction::AddR8 (Reg8::E),
+        Instruction::AddR8 (Reg8::H),
+        Instruction::AddR8 (Reg8::L),
         Instruction::EmptyLine,
         Instruction::AddI8 (Expr::Const(0xFF)),
         Instruction::AddMRhl,
@@ -553,9 +573,29 @@ fn test_sub() {
     sub e
     sub h
     sub l
+
+    sub a 0xFF
+    sub a [hl]
+    sub a a
+    sub a b
+    sub a c
+    sub a d
+    sub a e
+    sub a h
+    sub a l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::SubI8 (Expr::Const(0xFF)),
+        Instruction::SubMRhl,
+        Instruction::SubR8 (Reg8::A),
+        Instruction::SubR8 (Reg8::B),
+        Instruction::SubR8 (Reg8::C),
+        Instruction::SubR8 (Reg8::D),
+        Instruction::SubR8 (Reg8::E),
+        Instruction::SubR8 (Reg8::H),
+        Instruction::SubR8 (Reg8::L),
         Instruction::EmptyLine,
         Instruction::SubI8 (Expr::Const(0xFF)),
         Instruction::SubMRhl,
@@ -581,9 +621,29 @@ fn test_and() {
     and e
     and h
     and l
+
+    and a 0xFF
+    and a [hl]
+    and a a
+    and a b
+    and a c
+    and a d
+    and a e
+    and a h
+    and a l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::AndI8 (Expr::Const(0xFF)),
+        Instruction::AndMRhl,
+        Instruction::AndR8 (Reg8::A),
+        Instruction::AndR8 (Reg8::B),
+        Instruction::AndR8 (Reg8::C),
+        Instruction::AndR8 (Reg8::D),
+        Instruction::AndR8 (Reg8::E),
+        Instruction::AndR8 (Reg8::H),
+        Instruction::AndR8 (Reg8::L),
         Instruction::EmptyLine,
         Instruction::AndI8 (Expr::Const(0xFF)),
         Instruction::AndMRhl,
@@ -609,9 +669,29 @@ fn test_or() {
     or e
     or h
     or l
+
+    or a 0xFF
+    or a [hl]
+    or a a
+    or a b
+    or a c
+    or a d
+    or a e
+    or a h
+    or a l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::OrI8 (Expr::Const(0xFF)),
+        Instruction::OrMRhl,
+        Instruction::OrR8 (Reg8::A),
+        Instruction::OrR8 (Reg8::B),
+        Instruction::OrR8 (Reg8::C),
+        Instruction::OrR8 (Reg8::D),
+        Instruction::OrR8 (Reg8::E),
+        Instruction::OrR8 (Reg8::H),
+        Instruction::OrR8 (Reg8::L),
         Instruction::EmptyLine,
         Instruction::OrI8 (Expr::Const(0xFF)),
         Instruction::OrMRhl,
@@ -637,9 +717,29 @@ fn test_adc() {
     adc e
     adc h
     adc l
+
+    adc a 0xFF
+    adc a [hl]
+    adc a a
+    adc a b
+    adc a c
+    adc a d
+    adc a e
+    adc a h
+    adc a l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::AdcI8 (Expr::Const(0xFF)),
+        Instruction::AdcMRhl,
+        Instruction::AdcR8 (Reg8::A),
+        Instruction::AdcR8 (Reg8::B),
+        Instruction::AdcR8 (Reg8::C),
+        Instruction::AdcR8 (Reg8::D),
+        Instruction::AdcR8 (Reg8::E),
+        Instruction::AdcR8 (Reg8::H),
+        Instruction::AdcR8 (Reg8::L),
         Instruction::EmptyLine,
         Instruction::AdcI8 (Expr::Const(0xFF)),
         Instruction::AdcMRhl,
@@ -665,9 +765,29 @@ fn test_sbc() {
     sbc e
     sbc h
     sbc l
+
+    sbc a 0xFF
+    sbc a [hl]
+    sbc a a
+    sbc a b
+    sbc a c
+    sbc a d
+    sbc a e
+    sbc a h
+    sbc a l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::SbcI8 (Expr::Const(0xFF)),
+        Instruction::SbcMRhl,
+        Instruction::SbcR8 (Reg8::A),
+        Instruction::SbcR8 (Reg8::B),
+        Instruction::SbcR8 (Reg8::C),
+        Instruction::SbcR8 (Reg8::D),
+        Instruction::SbcR8 (Reg8::E),
+        Instruction::SbcR8 (Reg8::H),
+        Instruction::SbcR8 (Reg8::L),
         Instruction::EmptyLine,
         Instruction::SbcI8 (Expr::Const(0xFF)),
         Instruction::SbcMRhl,
@@ -693,9 +813,29 @@ fn test_xor() {
     xor e
     xor h
     xor l
+
+    xor a 0xFF
+    xor a [hl]
+    xor a a
+    xor a b
+    xor a c
+    xor a d
+    xor a e
+    xor a h
+    xor a l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::XorI8 (Expr::Const(0xFF)),
+        Instruction::XorMRhl,
+        Instruction::XorR8 (Reg8::A),
+        Instruction::XorR8 (Reg8::B),
+        Instruction::XorR8 (Reg8::C),
+        Instruction::XorR8 (Reg8::D),
+        Instruction::XorR8 (Reg8::E),
+        Instruction::XorR8 (Reg8::H),
+        Instruction::XorR8 (Reg8::L),
         Instruction::EmptyLine,
         Instruction::XorI8 (Expr::Const(0xFF)),
         Instruction::XorMRhl,
@@ -721,9 +861,29 @@ fn test_cp() {
     cp e
     cp h
     cp l
+
+    cp a 0xFF
+    cp a [hl]
+    cp a a
+    cp a b
+    cp a c
+    cp a d
+    cp a e
+    cp a h
+    cp a l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::CpI8 (Expr::Const(0xFF)),
+        Instruction::CpMRhl,
+        Instruction::CpR8 (Reg8::A),
+        Instruction::CpR8 (Reg8::B),
+        Instruction::CpR8 (Reg8::C),
+        Instruction::CpR8 (Reg8::D),
+        Instruction::CpR8 (Reg8::E),
+        Instruction::CpR8 (Reg8::H),
+        Instruction::CpR8 (Reg8::L),
         Instruction::EmptyLine,
         Instruction::CpI8 (Expr::Const(0xFF)),
         Instruction::CpMRhl,

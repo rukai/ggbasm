@@ -168,6 +168,16 @@ named!(parse_flag<CompleteStr, Flag>,
     )
 );
 
+// Other assemblers seem to use an "a" in add, sub etc. fairly unpredictably.
+// So I just made it optional instead of enforcing arbitrary rules.
+named!(reg_a<CompleteStr, CompleteStr>,
+    do_parse!(
+        a : tag_no_case!("a") >>
+        is_a!(WHITESPACE) >>
+        (a)
+    )
+);
+
 named!(deref_hl<CompleteStr, CompleteStr>,
     do_parse!(
         tag_no_case!("[") >>
@@ -350,6 +360,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("add") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::AddR8 (reg))
@@ -357,6 +368,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("add") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             deref_hl >>
             end_line >>
             (Instruction::AddMRhl)
@@ -364,6 +376,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("add") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             expr: parse_expr >>
             end_line >>
             (Instruction::AddI8 (expr))
@@ -389,6 +402,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("sub") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::SubR8 (reg))
@@ -396,6 +410,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("sub") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             deref_hl >>
             end_line >>
             (Instruction::SubMRhl)
@@ -403,6 +418,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("sub") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             expr: parse_expr >>
             end_line >>
             (Instruction::SubI8 (expr))
@@ -410,6 +426,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("and") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::AndR8 (reg))
@@ -417,6 +434,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("and") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             deref_hl >>
             end_line >>
             (Instruction::AndMRhl)
@@ -424,6 +442,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("and") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             expr: parse_expr >>
             end_line >>
             (Instruction::AndI8 (expr))
@@ -431,6 +450,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("or") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::OrR8 (reg))
@@ -438,6 +458,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("or") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             deref_hl >>
             end_line >>
             (Instruction::OrMRhl)
@@ -445,6 +466,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("or") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             expr: parse_expr >>
             end_line >>
             (Instruction::OrI8 (expr))
@@ -452,6 +474,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("adc") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::AdcR8 (reg))
@@ -459,6 +482,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("adc") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             deref_hl >>
             end_line >>
             (Instruction::AdcMRhl)
@@ -466,6 +490,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("adc") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             expr: parse_expr >>
             end_line >>
             (Instruction::AdcI8 (expr))
@@ -473,6 +498,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("sbc") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::SbcR8 (reg))
@@ -480,6 +506,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("sbc") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             deref_hl >>
             end_line >>
             (Instruction::SbcMRhl)
@@ -487,6 +514,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("sbc") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             expr: parse_expr >>
             end_line >>
             (Instruction::SbcI8 (expr))
@@ -494,6 +522,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("xor") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::XorR8 (reg))
@@ -501,6 +530,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("xor") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             deref_hl >>
             end_line >>
             (Instruction::XorMRhl)
@@ -508,6 +538,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("xor") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             expr: parse_expr >>
             end_line >>
             (Instruction::XorI8 (expr))
@@ -515,6 +546,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("cp") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::CpR8 (reg))
@@ -522,6 +554,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("cp") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             deref_hl >>
             end_line >>
             (Instruction::CpMRhl)
@@ -529,6 +562,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("cp") >>
             is_a!(WHITESPACE) >>
+            opt!(reg_a) >>
             expr: parse_expr >>
             end_line >>
             (Instruction::CpI8 (expr))
