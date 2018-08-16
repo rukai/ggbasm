@@ -276,27 +276,6 @@ named!(instruction<CompleteStr, Instruction>,
             (Instruction::Call (Flag::Always, expr))
         ) |
         do_parse!(
-            tag_no_case!("cp") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::CpR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("cp") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            end_line >>
-            (Instruction::CpMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("cp") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::CpI8 (expr))
-        ) |
-        do_parse!(
             tag_no_case!("jp") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("hl") >>
@@ -356,6 +335,174 @@ named!(instruction<CompleteStr, Instruction>,
             ) >>
             end_line >>
             (instruction)
+        ) |
+        do_parse!(
+            tag_no_case!("add") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::AddR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("add") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::AddMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("add") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::AddI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("sub") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::SubR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("sub") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::SubMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("sub") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::SubI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("and") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::AndR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("and") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::AndMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("and") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::AndI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("or") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::OrR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("or") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::OrMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("or") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::OrI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("adc") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::AdcR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("adc") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::AdcMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("adc") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::AdcI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("sbc") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::SbcR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("sbc") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::SbcMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("sbc") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::SbcI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("xor") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::XorR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("xor") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::XorMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("xor") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::XorI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("cp") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::CpR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("cp") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::CpMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("cp") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::CpI8 (expr))
         ) |
         do_parse!(
             tag_no_case!("ld") >>

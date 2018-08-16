@@ -380,34 +380,6 @@ a b c d
 }
 
 #[test]
-fn test_cp() {
-    let text = r#"
-    cp 0xFF
-    cp [hl]
-    cp a
-    cp b
-    cp c
-    cp d
-    cp e
-    cp h
-    cp l
-"#;
-    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
-    assert_eq!(result, vec!(
-        Instruction::EmptyLine,
-        Instruction::CpI8 (Expr::Const(0xFF)),
-        Instruction::CpMRhl,
-        Instruction::CpR8 (Reg8::A),
-        Instruction::CpR8 (Reg8::B),
-        Instruction::CpR8 (Reg8::C),
-        Instruction::CpR8 (Reg8::D),
-        Instruction::CpR8 (Reg8::E),
-        Instruction::CpR8 (Reg8::H),
-        Instruction::CpR8 (Reg8::L),
-    ));
-}
-
-#[test]
 fn test_jp() {
     let text = r#"
     jp 0x150
@@ -506,6 +478,231 @@ fn test_inc_dec() {
         Instruction::DecMRhl,
     ));
 }
+
+#[test]
+fn test_add() {
+    let text = r#"
+    add 0xFF
+    add [hl]
+    add a
+    add b
+    add c
+    add d
+    add e
+    add h
+    add l
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::AddI8 (Expr::Const(0xFF)),
+        Instruction::AddMRhl,
+        Instruction::AddR8 (Reg8::A),
+        Instruction::AddR8 (Reg8::B),
+        Instruction::AddR8 (Reg8::C),
+        Instruction::AddR8 (Reg8::D),
+        Instruction::AddR8 (Reg8::E),
+        Instruction::AddR8 (Reg8::H),
+        Instruction::AddR8 (Reg8::L),
+    ));
+}
+
+#[test]
+fn test_sub() {
+    let text = r#"
+    sub 0xFF
+    sub [hl]
+    sub a
+    sub b
+    sub c
+    sub d
+    sub e
+    sub h
+    sub l
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::SubI8 (Expr::Const(0xFF)),
+        Instruction::SubMRhl,
+        Instruction::SubR8 (Reg8::A),
+        Instruction::SubR8 (Reg8::B),
+        Instruction::SubR8 (Reg8::C),
+        Instruction::SubR8 (Reg8::D),
+        Instruction::SubR8 (Reg8::E),
+        Instruction::SubR8 (Reg8::H),
+        Instruction::SubR8 (Reg8::L),
+    ));
+}
+
+#[test]
+fn test_and() {
+    let text = r#"
+    and 0xFF
+    and [hl]
+    and a
+    and b
+    and c
+    and d
+    and e
+    and h
+    and l
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::AndI8 (Expr::Const(0xFF)),
+        Instruction::AndMRhl,
+        Instruction::AndR8 (Reg8::A),
+        Instruction::AndR8 (Reg8::B),
+        Instruction::AndR8 (Reg8::C),
+        Instruction::AndR8 (Reg8::D),
+        Instruction::AndR8 (Reg8::E),
+        Instruction::AndR8 (Reg8::H),
+        Instruction::AndR8 (Reg8::L),
+    ));
+}
+
+#[test]
+fn test_or() {
+    let text = r#"
+    or 0xFF
+    or [hl]
+    or a
+    or b
+    or c
+    or d
+    or e
+    or h
+    or l
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::OrI8 (Expr::Const(0xFF)),
+        Instruction::OrMRhl,
+        Instruction::OrR8 (Reg8::A),
+        Instruction::OrR8 (Reg8::B),
+        Instruction::OrR8 (Reg8::C),
+        Instruction::OrR8 (Reg8::D),
+        Instruction::OrR8 (Reg8::E),
+        Instruction::OrR8 (Reg8::H),
+        Instruction::OrR8 (Reg8::L),
+    ));
+}
+
+#[test]
+fn test_adc() {
+    let text = r#"
+    adc 0xFF
+    adc [hl]
+    adc a
+    adc b
+    adc c
+    adc d
+    adc e
+    adc h
+    adc l
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::AdcI8 (Expr::Const(0xFF)),
+        Instruction::AdcMRhl,
+        Instruction::AdcR8 (Reg8::A),
+        Instruction::AdcR8 (Reg8::B),
+        Instruction::AdcR8 (Reg8::C),
+        Instruction::AdcR8 (Reg8::D),
+        Instruction::AdcR8 (Reg8::E),
+        Instruction::AdcR8 (Reg8::H),
+        Instruction::AdcR8 (Reg8::L),
+    ));
+}
+
+#[test]
+fn test_sbc() {
+    let text = r#"
+    sbc 0xFF
+    sbc [hl]
+    sbc a
+    sbc b
+    sbc c
+    sbc d
+    sbc e
+    sbc h
+    sbc l
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::SbcI8 (Expr::Const(0xFF)),
+        Instruction::SbcMRhl,
+        Instruction::SbcR8 (Reg8::A),
+        Instruction::SbcR8 (Reg8::B),
+        Instruction::SbcR8 (Reg8::C),
+        Instruction::SbcR8 (Reg8::D),
+        Instruction::SbcR8 (Reg8::E),
+        Instruction::SbcR8 (Reg8::H),
+        Instruction::SbcR8 (Reg8::L),
+    ));
+}
+
+#[test]
+fn test_xor() {
+    let text = r#"
+    xor 0xFF
+    xor [hl]
+    xor a
+    xor b
+    xor c
+    xor d
+    xor e
+    xor h
+    xor l
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::XorI8 (Expr::Const(0xFF)),
+        Instruction::XorMRhl,
+        Instruction::XorR8 (Reg8::A),
+        Instruction::XorR8 (Reg8::B),
+        Instruction::XorR8 (Reg8::C),
+        Instruction::XorR8 (Reg8::D),
+        Instruction::XorR8 (Reg8::E),
+        Instruction::XorR8 (Reg8::H),
+        Instruction::XorR8 (Reg8::L),
+    ));
+}
+
+#[test]
+fn test_cp() {
+    let text = r#"
+    cp 0xFF
+    cp [hl]
+    cp a
+    cp b
+    cp c
+    cp d
+    cp e
+    cp h
+    cp l
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::CpI8 (Expr::Const(0xFF)),
+        Instruction::CpMRhl,
+        Instruction::CpR8 (Reg8::A),
+        Instruction::CpR8 (Reg8::B),
+        Instruction::CpR8 (Reg8::C),
+        Instruction::CpR8 (Reg8::D),
+        Instruction::CpR8 (Reg8::E),
+        Instruction::CpR8 (Reg8::H),
+        Instruction::CpR8 (Reg8::L),
+    ));
+}
+
 
 #[test]
 fn test_ld_r8_r8() {

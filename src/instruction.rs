@@ -196,9 +196,6 @@ pub enum Instruction {
     Halt,
     Di,
     Ei,
-    CpR8 (Reg8),
-    CpMRhl,
-    CpI8 (Expr),
     Ret (Flag),
     Reti,
     Call  (Flag, Expr),
@@ -211,6 +208,30 @@ pub enum Instruction {
     DecR16 (Reg16),
     DecR8  (Reg8),
     DecMRhl,
+    AddR8 (Reg8),
+    AddMRhl,
+    AddI8 (Expr),
+    SubR8 (Reg8),
+    SubMRhl,
+    SubI8 (Expr),
+    AndR8 (Reg8),
+    AndMRhl,
+    AndI8 (Expr),
+    OrR8 (Reg8),
+    OrMRhl,
+    OrI8 (Expr),
+    AdcR8 (Reg8),
+    AdcMRhl,
+    AdcI8 (Expr),
+    SbcR8 (Reg8),
+    SbcMRhl,
+    SbcI8 (Expr),
+    XorR8 (Reg8),
+    XorMRhl,
+    XorI8 (Expr),
+    CpR8 (Reg8),
+    CpMRhl,
+    CpI8 (Expr),
     LdR16I16 (Reg16, Expr),
     LdMI16Rsp (Expr),
     LdMRbcRa,
@@ -260,22 +281,6 @@ impl Instruction {
             Instruction::Halt       => rom.push(0x76),
             Instruction::Di         => rom.push(0xF3),
             Instruction::Ei         => rom.push(0xFB),
-            Instruction::CpR8 (reg) => {
-                match reg {
-                    Reg8::A => rom.push(0xBF),
-                    Reg8::B => rom.push(0xB8),
-                    Reg8::C => rom.push(0xB9),
-                    Reg8::D => rom.push(0xBA),
-                    Reg8::E => rom.push(0xBB),
-                    Reg8::H => rom.push(0xBC),
-                    Reg8::L => rom.push(0xBD),
-                }
-            }
-            Instruction::CpMRhl => rom.push(0xBE),
-            Instruction::CpI8 (expr) => {
-                rom.push(0xFE);
-                rom.push(expr.get_byte(constants)?);
-            }
             Instruction::Reti => rom.push(0xD9),
             Instruction::Ret (flag) => {
                 match flag {
@@ -357,6 +362,134 @@ impl Instruction {
                 }
             }
             Instruction::DecMRhl => rom.push(0x035),
+            Instruction::AddR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0x87),
+                    Reg8::B => rom.push(0x80),
+                    Reg8::C => rom.push(0x81),
+                    Reg8::D => rom.push(0x82),
+                    Reg8::E => rom.push(0x83),
+                    Reg8::H => rom.push(0x84),
+                    Reg8::L => rom.push(0x85),
+                }
+            }
+            Instruction::AddMRhl => rom.push(0x86),
+            Instruction::AddI8 (expr) => {
+                rom.push(0xC6);
+                rom.push(expr.get_byte(constants)?);
+            }
+            Instruction::SubR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0x97),
+                    Reg8::B => rom.push(0x90),
+                    Reg8::C => rom.push(0x91),
+                    Reg8::D => rom.push(0x92),
+                    Reg8::E => rom.push(0x93),
+                    Reg8::H => rom.push(0x94),
+                    Reg8::L => rom.push(0x95),
+                }
+            }
+            Instruction::SubMRhl => rom.push(0x96),
+            Instruction::SubI8 (expr) => {
+                rom.push(0xD6);
+                rom.push(expr.get_byte(constants)?);
+            }
+            Instruction::AndR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0xA7),
+                    Reg8::B => rom.push(0xA0),
+                    Reg8::C => rom.push(0xA1),
+                    Reg8::D => rom.push(0xA2),
+                    Reg8::E => rom.push(0xA3),
+                    Reg8::H => rom.push(0xA4),
+                    Reg8::L => rom.push(0xA5),
+                }
+            }
+            Instruction::AndMRhl => rom.push(0xA6),
+            Instruction::AndI8 (expr) => {
+                rom.push(0xE6);
+                rom.push(expr.get_byte(constants)?);
+            }
+            Instruction::OrR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0xB7),
+                    Reg8::B => rom.push(0xB0),
+                    Reg8::C => rom.push(0xB1),
+                    Reg8::D => rom.push(0xB2),
+                    Reg8::E => rom.push(0xB3),
+                    Reg8::H => rom.push(0xB4),
+                    Reg8::L => rom.push(0xB5),
+                }
+            }
+            Instruction::OrMRhl => rom.push(0xB6),
+            Instruction::OrI8 (expr) => {
+                rom.push(0xF6);
+                rom.push(expr.get_byte(constants)?);
+            }
+            Instruction::AdcR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0x8F),
+                    Reg8::B => rom.push(0x88),
+                    Reg8::C => rom.push(0x89),
+                    Reg8::D => rom.push(0x8A),
+                    Reg8::E => rom.push(0x8B),
+                    Reg8::H => rom.push(0x8C),
+                    Reg8::L => rom.push(0x8D),
+                }
+            }
+            Instruction::AdcMRhl => rom.push(0x8E),
+            Instruction::AdcI8 (expr) => {
+                rom.push(0xCE);
+                rom.push(expr.get_byte(constants)?);
+            }
+            Instruction::SbcR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0x9F),
+                    Reg8::B => rom.push(0x98),
+                    Reg8::C => rom.push(0x99),
+                    Reg8::D => rom.push(0x9A),
+                    Reg8::E => rom.push(0x9B),
+                    Reg8::H => rom.push(0x9C),
+                    Reg8::L => rom.push(0x9D),
+                }
+            }
+            Instruction::SbcMRhl => rom.push(0x9E),
+            Instruction::SbcI8 (expr) => {
+                rom.push(0xDE);
+                rom.push(expr.get_byte(constants)?);
+            }
+            Instruction::XorR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0xAF),
+                    Reg8::B => rom.push(0xA8),
+                    Reg8::C => rom.push(0xA9),
+                    Reg8::D => rom.push(0xAA),
+                    Reg8::E => rom.push(0xAB),
+                    Reg8::H => rom.push(0xAC),
+                    Reg8::L => rom.push(0xAD),
+                }
+            }
+            Instruction::XorMRhl => rom.push(0xAE),
+            Instruction::XorI8 (expr) => {
+                rom.push(0xEE);
+                rom.push(expr.get_byte(constants)?);
+            }
+            Instruction::CpR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0xBF),
+                    Reg8::B => rom.push(0xB8),
+                    Reg8::C => rom.push(0xB9),
+                    Reg8::D => rom.push(0xBA),
+                    Reg8::E => rom.push(0xBB),
+                    Reg8::H => rom.push(0xBC),
+                    Reg8::L => rom.push(0xBD),
+                }
+            }
+            Instruction::CpMRhl => rom.push(0xBE),
+            Instruction::CpI8 (expr) => {
+                rom.push(0xFE);
+                rom.push(expr.get_byte(constants)?);
+            }
             Instruction::LdR16I16 (reg, expr) => {
                 match reg {
                     Reg16::BC => rom.push(0x01),
@@ -498,9 +631,6 @@ impl Instruction {
             Instruction::Halt            => 1,
             Instruction::Di              => 1,
             Instruction::Ei              => 1,
-            Instruction::CpR8 (_)        => 1,
-            Instruction::CpMRhl          => 1,
-            Instruction::CpI8 (_)        => 2,
             Instruction::Ret (_)         => 1,
             Instruction::Reti            => 1,
             Instruction::Call (_,_)      => 3,
@@ -513,6 +643,30 @@ impl Instruction {
             Instruction::DecR16 (_)      => 1,
             Instruction::DecR8 (_)       => 1,
             Instruction::DecMRhl         => 1,
+            Instruction::AddR8 (_)       => 1,
+            Instruction::AddMRhl         => 1,
+            Instruction::AddI8 (_)       => 2,
+            Instruction::SubR8 (_)       => 1,
+            Instruction::SubMRhl         => 1,
+            Instruction::SubI8 (_)       => 2,
+            Instruction::AndR8 (_)       => 1,
+            Instruction::AndMRhl         => 1,
+            Instruction::AndI8 (_)       => 2,
+            Instruction::OrR8 (_)        => 1,
+            Instruction::OrMRhl          => 1,
+            Instruction::OrI8 (_)        => 2,
+            Instruction::AdcR8 (_)       => 1,
+            Instruction::AdcMRhl         => 1,
+            Instruction::AdcI8 (_)       => 2,
+            Instruction::SbcR8 (_)       => 1,
+            Instruction::SbcMRhl         => 1,
+            Instruction::SbcI8 (_)       => 2,
+            Instruction::XorR8 (_)       => 1,
+            Instruction::XorMRhl         => 1,
+            Instruction::XorI8 (_)       => 2,
+            Instruction::CpR8 (_)        => 1,
+            Instruction::CpMRhl          => 1,
+            Instruction::CpI8 (_)        => 2,
             Instruction::LdR16I16 (_, _) => 3,
             Instruction::LdMI16Rsp (_)   => 3,
             Instruction::LdR8I8 (_, _)   => 2,
