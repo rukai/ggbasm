@@ -202,6 +202,14 @@ pub enum Instruction {
     Halt,
     Di,
     Ei,
+    Rrca,
+    Rra,
+    Cpl,
+    Ccf,
+    Rlca,
+    Rla,
+    Daa,
+    Scf,
     Ret (Flag),
     Reti,
     Call  (Flag, Expr),
@@ -217,6 +225,8 @@ pub enum Instruction {
     AddR8 (Reg8),
     AddMRhl,
     AddI8 (Expr),
+    AddRhlR16 (Reg16),
+    AddRspI8 (Expr),
     SubR8 (Reg8),
     SubMRhl,
     SubI8 (Expr),
@@ -287,6 +297,14 @@ impl Instruction {
             Instruction::Halt       => rom.push(0x76),
             Instruction::Di         => rom.push(0xF3),
             Instruction::Ei         => rom.push(0xFB),
+            Instruction::Rrca       => rom.push(0x0F),
+            Instruction::Rra        => rom.push(0x1F),
+            Instruction::Cpl        => rom.push(0x2F),
+            Instruction::Ccf        => rom.push(0x3F),
+            Instruction::Rlca       => rom.push(0x07),
+            Instruction::Rla        => rom.push(0x17),
+            Instruction::Daa        => rom.push(0x27),
+            Instruction::Scf        => rom.push(0x37),
             Instruction::Reti => rom.push(0xD9),
             Instruction::Ret (flag) => {
                 match flag {
@@ -382,6 +400,18 @@ impl Instruction {
             Instruction::AddMRhl => rom.push(0x86),
             Instruction::AddI8 (expr) => {
                 rom.push(0xC6);
+                rom.push(expr.get_byte(constants)?);
+            }
+            Instruction::AddRhlR16 (reg) => {
+                match reg {
+                    Reg16::BC => rom.push(0x09),
+                    Reg16::DE => rom.push(0x19),
+                    Reg16::HL => rom.push(0x29),
+                    Reg16::SP => rom.push(0x39),
+                }
+            }
+            Instruction::AddRspI8 (expr) => {
+                rom.push(0xE8);
                 rom.push(expr.get_byte(constants)?);
             }
             Instruction::SubR8 (reg) => {
@@ -637,6 +667,14 @@ impl Instruction {
             Instruction::Halt            => 1,
             Instruction::Di              => 1,
             Instruction::Ei              => 1,
+            Instruction::Rrca            => 1,
+            Instruction::Rra             => 1,
+            Instruction::Cpl             => 1,
+            Instruction::Ccf             => 1,
+            Instruction::Rlca            => 1,
+            Instruction::Rla             => 1,
+            Instruction::Daa             => 1,
+            Instruction::Scf             => 1,
             Instruction::Ret (_)         => 1,
             Instruction::Reti            => 1,
             Instruction::Call (_,_)      => 3,
@@ -652,6 +690,8 @@ impl Instruction {
             Instruction::AddR8 (_)       => 1,
             Instruction::AddMRhl         => 1,
             Instruction::AddI8 (_)       => 2,
+            Instruction::AddRhlR16 (_)   => 1,
+            Instruction::AddRspI8 (_)    => 2,
             Instruction::SubR8 (_)       => 1,
             Instruction::SubMRhl         => 1,
             Instruction::SubI8 (_)       => 2,

@@ -114,6 +114,14 @@ fn test_simple_instructions() {
     halt
     di
     ei
+    rrca
+    rra
+    cpl
+    ccf
+    rlca
+    rla
+    daa
+    scf
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -123,6 +131,14 @@ fn test_simple_instructions() {
         Instruction::Halt,
         Instruction::Di,
         Instruction::Ei,
+        Instruction::Rrca,
+        Instruction::Rra,
+        Instruction::Cpl,
+        Instruction::Ccf,
+        Instruction::Rlca,
+        Instruction::Rla,
+        Instruction::Daa,
+        Instruction::Scf,
     ));
 }
 
@@ -497,6 +513,12 @@ fn test_add() {
     add e
     add h
     add l
+
+    add hl bc
+    add hl de
+    add hl hl
+    add hl sp
+    add sp 2
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -510,6 +532,12 @@ fn test_add() {
         Instruction::AddR8 (Reg8::E),
         Instruction::AddR8 (Reg8::H),
         Instruction::AddR8 (Reg8::L),
+        Instruction::EmptyLine,
+        Instruction::AddRhlR16 (Reg16::BC),
+        Instruction::AddRhlR16 (Reg16::DE),
+        Instruction::AddRhlR16 (Reg16::HL),
+        Instruction::AddRhlR16 (Reg16::SP),
+        Instruction::AddRspI8 (Expr::Const(2)),
     ));
 }
 

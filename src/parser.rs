@@ -254,6 +254,14 @@ named!(instruction<CompleteStr, Instruction>,
         terminated!(value!(Instruction::Di,   tag_no_case!("di")),   end_line) |
         terminated!(value!(Instruction::Ei,   tag_no_case!("ei")),   end_line) |
         terminated!(value!(Instruction::Reti, tag_no_case!("reti")), end_line) |
+        terminated!(value!(Instruction::Rrca, tag_no_case!("rrca")), end_line) |
+        terminated!(value!(Instruction::Rra,  tag_no_case!("rra")), end_line) |
+        terminated!(value!(Instruction::Cpl,  tag_no_case!("cpl")), end_line) |
+        terminated!(value!(Instruction::Ccf,  tag_no_case!("ccf")), end_line) |
+        terminated!(value!(Instruction::Rlca, tag_no_case!("rlca")), end_line) |
+        terminated!(value!(Instruction::Rla,  tag_no_case!("rla")), end_line) |
+        terminated!(value!(Instruction::Daa,  tag_no_case!("daa")), end_line) |
+        terminated!(value!(Instruction::Scf,  tag_no_case!("scf")), end_line) |
         terminated!(value!(Instruction::Ret (Flag::Always),  tag_no_case!("ret")),  end_line) |
         do_parse!(
             tag_no_case!("ret") >>
@@ -359,6 +367,24 @@ named!(instruction<CompleteStr, Instruction>,
             expr: parse_expr >>
             end_line >>
             (Instruction::AddI8 (expr))
+        ) |
+        do_parse!(
+            tag_no_case!("add") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("hl") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u16 >>
+            end_line >>
+            (Instruction::AddRhlR16 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("add") >>
+            is_a!(WHITESPACE) >>
+            tag_no_case!("sp") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::AddRspI8 (expr))
         ) |
         do_parse!(
             tag_no_case!("sub") >>
