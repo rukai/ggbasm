@@ -196,6 +196,9 @@ pub enum Instruction {
     Halt,
     Di,
     Ei,
+    CpR8 (Reg8),
+    CpMRhl,
+    CpI8 (Expr),
     Ret (Flag),
     Reti,
     Call  (Flag, Expr),
@@ -257,7 +260,23 @@ impl Instruction {
             Instruction::Halt       => rom.push(0x76),
             Instruction::Di         => rom.push(0xF3),
             Instruction::Ei         => rom.push(0xFB),
-            Instruction::Reti       => rom.push(0xD9),
+            Instruction::CpR8 (reg) => {
+                match reg {
+                    Reg8::A => rom.push(0xBF),
+                    Reg8::B => rom.push(0xB8),
+                    Reg8::C => rom.push(0xB9),
+                    Reg8::D => rom.push(0xBA),
+                    Reg8::E => rom.push(0xBB),
+                    Reg8::H => rom.push(0xBC),
+                    Reg8::L => rom.push(0xBD),
+                }
+            }
+            Instruction::CpMRhl => rom.push(0xBE),
+            Instruction::CpI8 (expr) => {
+                rom.push(0xFE);
+                rom.push(expr.get_byte(constants)?);
+            }
+            Instruction::Reti => rom.push(0xD9),
             Instruction::Ret (flag) => {
                 match flag {
                     Flag::Always => rom.push(0xC9),
@@ -479,6 +498,9 @@ impl Instruction {
             Instruction::Halt            => 1,
             Instruction::Di              => 1,
             Instruction::Ei              => 1,
+            Instruction::CpR8 (_)        => 1,
+            Instruction::CpMRhl          => 1,
+            Instruction::CpI8 (_)        => 2,
             Instruction::Ret (_)         => 1,
             Instruction::Reti            => 1,
             Instruction::Call (_,_)      => 3,

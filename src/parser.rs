@@ -6,7 +6,7 @@ use nom::types::CompleteStr;
 
 use crate::instruction::*;
 
-static IDENT: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_";
+static IDENT:      &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_";
 static HEX:        &str = "1234567890ABCDEFabcdef";
 static DEC:        &str = "1234567890";
 static WHITESPACE: &str = " \t";
@@ -274,6 +274,27 @@ named!(instruction<CompleteStr, Instruction>,
             expr: parse_expr >>
             end_line >>
             (Instruction::Call (Flag::Always, expr))
+        ) |
+        do_parse!(
+            tag_no_case!("cp") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::CpR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("cp") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::CpMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("cp") >>
+            is_a!(WHITESPACE) >>
+            expr: parse_expr >>
+            end_line >>
+            (Instruction::CpI8 (expr))
         ) |
         do_parse!(
             tag_no_case!("jp") >>

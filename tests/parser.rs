@@ -380,6 +380,34 @@ a b c d
 }
 
 #[test]
+fn test_cp() {
+    let text = r#"
+    cp 0xFF
+    cp [hl]
+    cp a
+    cp b
+    cp c
+    cp d
+    cp e
+    cp h
+    cp l
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::CpI8 (Expr::Const(0xFF)),
+        Instruction::CpMRhl,
+        Instruction::CpR8 (Reg8::A),
+        Instruction::CpR8 (Reg8::B),
+        Instruction::CpR8 (Reg8::C),
+        Instruction::CpR8 (Reg8::D),
+        Instruction::CpR8 (Reg8::E),
+        Instruction::CpR8 (Reg8::H),
+        Instruction::CpR8 (Reg8::L),
+    ));
+}
+
+#[test]
 fn test_jp() {
     let text = r#"
     jp 0x150
