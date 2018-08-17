@@ -51,21 +51,32 @@ pub enum UnaryOperator {
 
 impl Expr {
     pub fn get_2bytes(&self, constants: &HashMap<String, i64>) -> Result<[u8; 2], ExprRunError> {
-        let mut result = [0, 0];
-        LittleEndian::write_u16(&mut result, self.run(constants)? as u16);
-        Ok(result)
+        let value = self.run(constants)?;
+        if value > 0xFFFF {
+            Err(ExprRunError::ResultDoesntFit (format!("0x{} > 0xFFFF This is invalid because the value needs to fit in two bytes", value)))
+        } else {
+            let mut result = [0, 0];
+            LittleEndian::write_u16(&mut result, value as u16);
+            Ok(result)
+        }
     }
 
     pub fn get_byte(&self, constants: &HashMap<String, i64>) -> Result<u8, ExprRunError> {
-        Ok(self.run(constants)? as u8)
+        let value = self.run(constants)?;
+        if value > 0xFF {
+            Err(ExprRunError::ResultDoesntFit (format!("0x{:x} > 0xFF This is invalid because the value needs to fit in one byte", value)))
+        } else {
+            Ok(value as u8)
+        }
     }
 
-    pub fn get_bit_index(&self, constants: &HashMap<String, i64>) -> Result<u8, Error> {
+    pub fn get_bit_index(&self, constants: &HashMap<String, i64>) -> Result<u8, ExprRunError> {
         let value = self.run(constants)?;
         if value > 7 {
-            bail!("bit is > 7");
+            Err(ExprRunError::ResultDoesntFit (format!("{} > 7 This is invalid because the value needs to index bits in a byte.", value)))
+        } else {
+            Ok(value as u8)
         }
-        Ok(value as u8)
     }
 
     pub fn run(&self, constants: &HashMap<String, i64>) -> Result<i64, ExprRunError> {
@@ -115,7 +126,7 @@ impl Expr {
                         if right == 0 {
                             Err(ExprRunError::ArithmeticError (format!("Attempted to divide by zero (remainder): {:?} % {:?}", binary.left, binary.right)))
                         } else {
-                            match left.checked_div(right) {
+                            match left.checked_rem(right) {
                                 Some(value) => Ok(value),
                                 None        => Err(ExprRunError::ArithmeticError (format!("Remainder overflowed: {:?} % {:?}", binary.left, binary.right)))
                             }
@@ -146,7 +157,9 @@ pub enum ExprRunError {
     #[fail(display = "Identifier {} can not be found.", _0)]
     MissingIdentifier (String),
     #[fail(display = "Arithmetic error: {}", _0)]
-    ArithmeticError (String)
+    ArithmeticError (String),
+    #[fail(display = "{}", _0)]
+    ResultDoesntFit (String),
 }
 
 #[derive(PartialEq, Debug)]
@@ -308,7 +321,7 @@ impl Instruction {
             Instruction::Db (bytes) => rom.extend(bytes.iter()),
             Instruction::Nop        => rom.push(0x00),
             Instruction::Stop       => rom.push(0x10),
-            Instruction::Halt       => rom.push(0x76),
+            Instruction::Halt       => rom.extend([0x76, 0x00].iter()),
             Instruction::Di         => rom.push(0xF3),
             Instruction::Ei         => rom.push(0xFB),
             Instruction::Rrca       => rom.push(0x0F),
@@ -351,6 +364,14 @@ impl Instruction {
             }
             Instruction::JpRhl => rom.push(0xE9),
             Instruction::Jr (flag, expr) => {
+                let abs_dest = expr.run(constants)?;
+                let rel_dest = abs_dest - rom.len() as i64 - 2; // 2 accounts for the 2 bytes that the make up the jr instruction
+                if rel_dest > 0x7F {
+                    bail!("0x{} > 0x7F This is invalid because the value needs to fit in a signed byte", rel_dest);
+                }
+                else if rel_dest < -0x80 {
+                    bail!("0x{} < 0x80 This is invalid because the value needs to fit in a signed byte", rel_dest);
+                }
                 match flag {
                     Flag::Always => rom.push(0x18),
                     Flag::Z      => rom.push(0x28),
@@ -358,7 +379,7 @@ impl Instruction {
                     Flag::NZ     => rom.push(0x20),
                     Flag::NC     => rom.push(0x30),
                 }
-                rom.push(expr.get_byte(constants)?);
+                rom.push(rel_dest as u8);
             }
             Instruction::IncR16 (reg) => {
                 match reg {
@@ -715,7 +736,7 @@ impl Instruction {
             Instruction::Db (bytes)      => bytes.len() as u16,
             Instruction::Nop             => 1,
             Instruction::Stop            => 1,
-            Instruction::Halt            => 1,
+            Instruction::Halt            => 2,
             Instruction::Di              => 1,
             Instruction::Ei              => 1,
             Instruction::Rrca            => 1,

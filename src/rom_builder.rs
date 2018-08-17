@@ -278,6 +278,8 @@ impl RomBuilder {
         self.address / ROM_BANK_SIZE
     }
 
+    // TODO: Doesnt include EQU constants. consume self, move EQU processing into another function
+    // then call it here as well.
     pub fn print_variables_by_value(self) -> Result<Self, Error> {
         let mut sorted: Vec<_> = self.constants.iter().collect();
         sorted.sort_by_key(|x| x.1);
@@ -289,7 +291,7 @@ impl RomBuilder {
 
     pub fn print_variables_by_identifier(self) -> Result<Self, Error> {
         let mut sorted: Vec<_> = self.constants.iter().collect();
-        sorted.sort_by_key(|x| x.0);
+        sorted.sort_by_key(|x| x.0.to_lowercase());
         for (ident, value) in sorted {
             println!("{} - 0x{:x}", ident, value);
         }
@@ -368,7 +370,8 @@ impl RomBuilder {
                         false
                     }
                     Err(ExprRunError::MissingIdentifier (_)) => true,
-                    Err(ExprRunError::ArithmeticError (error) ) => {
+                    Err(ExprRunError::ResultDoesntFit (error)) |
+                    Err(ExprRunError::ArithmeticError (error)) => {
                         outer_error = Some(format!("Error occured in {} on line {}: {}", equ.source.to_string(), equ.line, error));
                         true
                     }

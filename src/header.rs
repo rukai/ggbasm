@@ -171,9 +171,17 @@ impl Header {
         rom.push(if self.japanese { 0x00 } else { 0x01 });
         rom.push(0x33); // we are using the new licence, so set old licence accordingly
         rom.push(self.version_number);
-        rom.push(0x00); // Header checksum TODO
-        rom.push(0x00); // Global checksum
-        rom.push(0x00); // Global checksum
+
+        let mut checksum: u8 = 0;
+        for byte in &rom[0x0134..0x014D] {
+            checksum = checksum.wrapping_sub(*byte);
+            checksum = checksum.wrapping_sub(1);
+        }
+        rom.push(checksum);
+
+        // Global checksum, gameboy doesnt care about these
+        rom.push(0x00);
+        rom.push(0x00);
     }
 }
 

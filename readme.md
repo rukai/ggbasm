@@ -8,7 +8,7 @@ Being a library instead of command line application, allows for an elegant combi
 
 ## Development Status
 
-This library is extremely WIP.
+64 opcodes to go (0xCB 0x00-0x4F)
 
 ## RomBuilder
 
