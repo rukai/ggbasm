@@ -1,3 +1,5 @@
+//! Contains the main API of GGBASM.
+
 use std::env;
 use std::fs::File;
 use std::fs;
@@ -10,10 +12,12 @@ use failure::bail;
 use image;
 
 use crate::header::{Header, CartridgeType};
-use crate::instruction::{Instruction, ExprRunError, Expr};
+use crate::ast::{Instruction, ExprRunError, Expr};
 use crate::constants::*;
 use crate::parser;
 
+/// Represents a color in modern images.
+/// Used when mapping colors from modern images to gameboy graphics.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Color {
     pub red: u8,
@@ -27,14 +31,15 @@ impl Color {
     }
 }
 
-pub enum Data {
+enum Data {
     Instructions (Vec<Instruction>),
-    Binary       { bytes: Vec<u8>, identifier: String },
+    Binary       (Vec<u8>),
     Header       (Header),
     DummyInterruptsAndJumps,
 }
 
-pub enum DataSource {
+/// Keeps track of where data came from, used to generate error messages.
+enum DataSource {
     File (String),
     Code /* TODO: Include stacktrace */
 }
@@ -48,7 +53,7 @@ impl DataSource {
     }
 }
 
-pub struct DataHolder {
+struct DataHolder {
     data:    Data,
     #[allow(dead_code)]
     source:  DataSource,
@@ -57,12 +62,13 @@ pub struct DataHolder {
 }
 
 /// Keeps track of the state of a rom as it is being constructed.
+///
 /// Keeps track of the current address and inserts binary data and instructions at that address.
 /// The address is advanced when binary data or instructions are added and can also be manually advanced.
 /// When manually advanced the area in between is filled with zeroes.
 /// The address can only be advanced, it can never go backwards.
 ///
-/// In *.asm files, the advance_address instruction will cause the space between the last instruction 
+/// In *.asm files, the advance_address instruction will cause the space between the last instruction .
 /// and the new address to be filled with zeroes.
 pub struct RomBuilder {
     data:             Vec<DataHolder>,
@@ -83,6 +89,7 @@ impl RomBuilder {
     }
 
     /// Adds basic interrupt and jump data from 0x0000 to 0x0103.
+    ///
     /// The entry point jumps to 0x0150.
     /// The interrupts return immediately.
     /// The RST commands jump to the entry point.
@@ -103,6 +110,7 @@ impl RomBuilder {
     }
 
     /// Adds provided header data at 0x0104 to 0x149.
+    ///
     /// Returns an error if the RomBuilder address is not at 0x104
     pub fn add_header(mut self, header: Header) -> Result<Self, Error> {
         if self.address != 0x0104 {
@@ -133,17 +141,16 @@ impl RomBuilder {
 
     /// Includes raw bytes in the rom.
     /// The name is used to reference the address in assembly code.
-    /// Returns an error if crosses rom bank boundaries
+    /// Returns an error if crosses rom bank boundaries.
     pub fn add_bytes(mut self, bytes: Vec<u8>, identifier: &str) -> Result<Self, Error> {
         let len = bytes.len() as u32;
-        let identifier = String::from(identifier);
         if let Some(_) = self.constants.insert(identifier.to_string(), self.address as i64) {
             // TODO: Display first usage
             bail!("Identifier {} is already used", identifier)
         }
 
         self.data.push(DataHolder {
-            data:    Data::Binary { bytes, identifier },
+            data:    Data::Binary (bytes),
             address: self.address,
             source:  DataSource::Code,
         });
@@ -157,12 +164,14 @@ impl RomBuilder {
         }
     }
 
-    /// Includes graphics bytes in the rom generated from the provided image file.
+    /// Includes graphics data generated from the provided image file in the graphics folder.
+    ///
     /// The name is used to reference the address in assembly code.
-    /// Returns an error if crosses rom bank boundaries
+    /// Returns an error if crosses rom bank boundaries.
     /// The color_map argument specifes how to convert 24 bit rgb color values into the 2 bit color values used by the gameboy.
+    ///
+    /// TODO: Describe the format of generated images.
     pub fn add_image(mut self, file_name: &str, identifier: &str, color_map: &HashMap<Color, u8>) -> Result<Self, Error> {
-        let identifier = String::from(identifier);
         if let Some(_) = self.constants.insert(identifier.to_string(), self.address as i64) {
             // TODO: Display first usage
             bail!("Identifier {} is already used", identifier)
@@ -202,7 +211,7 @@ impl RomBuilder {
         let size = bytes.len();
 
         self.data.push(DataHolder {
-            data:    Data::Binary { bytes, identifier },
+            data:    Data::Binary (bytes),
             address: self.address,
             source:  DataSource::Code,
         });
@@ -216,7 +225,8 @@ impl RomBuilder {
         }
     }
 
-    /// This function is used to include a *.asm file from the gbasm folder.
+    /// Includes bytecodes generated from the provided assembly file in the gbasm folder.
+    ///
     /// Returns an error if crosses rom bank boundaries.
     /// Returns an error if encounters file system issues.
     pub fn add_asm_file(self, file_name: &str) -> Result<Self, Error> {
@@ -306,17 +316,17 @@ impl RomBuilder {
         }
     }
 
-    /// Gets the current address within the entire rom
+    /// Gets the current address within the entire rom.
     pub fn get_address_global(&self) -> u32 {
         self.address
     }
 
-    /// Gets the current address within the current bank
+    /// Gets the current address within the current bank.
     pub fn get_address_bank(&self) -> u16 {
         (self.address % ROM_BANK_SIZE) as u16
     }
 
-    /// Gets the current bank
+    /// Gets the current bank.
     pub fn get_bank(&self) -> u32 {
         self.address / ROM_BANK_SIZE
     }
@@ -341,7 +351,7 @@ impl RomBuilder {
         Ok(self)
     }
 
-    /// Compiles assembly and binary data into binary rom data
+    /// Compiles assembly and binary data into binary rom data.
     pub fn compile(mut self) -> Result<Vec<u8>, Error> {
         if self.data.last().is_none() {
             bail!("No instructions or binary data was added to the RomBuilder");
@@ -481,7 +491,7 @@ impl RomBuilder {
                 Data::Header (header) => {
                     header.write(&mut rom, rom_size_factor as u8);
                 }
-                Data::Binary { bytes, .. } => {
+                Data::Binary (bytes) => {
                     rom.extend(bytes);
                 }
                 Data::Instructions (instructions) => {
@@ -562,7 +572,7 @@ impl RomBuilder {
         Ok(rom)
     }
 
-    /// Compile the rom then write it to disk at the root of the project.
+    /// Compile the ROM then write it to disk at the root of the project.
     /// The root of the project is the outermost directory containing a Cargo.toml file.
     pub fn write_to_disk(self, name: &str) -> Result<(), Error> {
         let output = self.root_dir.as_path().join(name);
@@ -571,7 +581,7 @@ impl RomBuilder {
         Ok(())
     }
 
-    /// Iteratively search for the innermost Cargo.toml starting at the current
+    /// Iteratively search for the innermost Cargo.toml starting at the current.
     /// working directory and working up through its parents.
     /// Returns the path to the directory the Cargo.toml is in.
     /// Or an error if the file couldn't be found.

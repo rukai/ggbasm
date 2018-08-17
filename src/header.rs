@@ -1,3 +1,8 @@
+//! Define the ROM header via a typed interface.
+//!
+//! The Header struct is the main type, create one with the values needed for your rom.
+//! Then pass it the RomBuilder via add_header.
+
 pub enum ColorSupport {
     Unsupported,
     SupportedBackwardsCompatible,

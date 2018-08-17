@@ -1,10 +1,12 @@
+//! Parse asm files into an AST.
+
 use byteorder::{LittleEndian, WriteBytesExt};
 use failure::Error;
 use failure::bail;
 use nom::*;
 use nom::types::CompleteStr;
 
-use crate::instruction::*;
+use crate::ast::*;
 
 static IDENT:      &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_";
 static HEX:        &str = "1234567890ABCDEFabcdef";
@@ -921,6 +923,8 @@ named!(instructions<CompleteStr, Vec<Option<Instruction>> >,
     )
 );
 
+/// Parses the text in the provided &str into a Vec<Option<Instruction>>
+/// Instructions are None when that line fails to parse.
 pub fn parse_asm(text: &str) -> Result<Vec<Option<Instruction>>, Error> {
     // Ensure a trailing \n is included TODO: Avoid this copy, should be able to handle this in the parser combinator
     let mut text = String::from(text);
@@ -928,7 +932,7 @@ pub fn parse_asm(text: &str) -> Result<Vec<Option<Instruction>>, Error> {
         text.push('\n');
     }
 
-    // The completeByteSlice disables nom's streaming features, this stops the combinators from returning Incomplete
+    // The CompleteStr disables nom's streaming features, this stops the combinators from returning Incomplete
     match instructions(CompleteStr(&text)) {
         Ok(instructions) => Ok(instructions.1),
         Err(err)         => bail!("{}", err), // Convert error to text immediately to avoid lifetime issues

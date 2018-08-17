@@ -1,4 +1,4 @@
-use ggbasm::rom_builder::RomBuilder;
+use ggbasm::RomBuilder;
 
 fn main() {
     // unwrap so that CI will fail on an error

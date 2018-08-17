@@ -10,12 +10,20 @@ Being a library instead of command line application, allows for an elegant combi
 
 64 opcodes to go (0xCB 0x00-0x4F)
 
+Requires nightly rust, because I thought it would be fun to use rust 2018 and I didn't realize I would make progress this quickly >.>
+
+## Docs
+
+[![docs.rs](https://docs.rs/mio/ggbasm.svg)](https://docs.rs/crate/ggbasm)
+Docs.rs doesnt work because ggbasm requires nightly.
+Instead you can use `cargo doc` on your local machine.
+
 ## RomBuilder
 
 The RomBuilder is the core rust api of GGBASM.
 
 ```rust
-RomBuilder::new()
+RomBuilder::new()?
     // Starts off in the first rom bank
     // A simple example doesnt need to deal with interrupts and jumps, so generate a dummy
     .add_basic_interrupts_and_jumps()?
@@ -28,11 +36,15 @@ RomBuilder::new()
 
     // Add an image to the second rom bank
     .advance_address(1, 0)?
-    .add_bytes(image)?;
+    .add_image("tiles.png", "GraphicsBinary", &colors_map)?
 
     // Consume the RomBuilder and write the rom to disk
     .write_to_disk("my_cool_game.gb")?;
 ```
+
+## Examples
+
+Check out the [examples folder](https://github.com/rukai/ggbasm/tree/master/examples) and [heartacheGB](https://github.com/rukai/HeartacheGB).
 
 ## Comparison with [RGBDS](https://github.com/rednex/rgbds)
 

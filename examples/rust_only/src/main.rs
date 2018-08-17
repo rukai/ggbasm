@@ -1,6 +1,6 @@
 use failure::Error;
 
-use ggbasm::rom_builder::RomBuilder;
+use ggbasm::RomBuilder;
 use ggbasm::header::{Header, ColorSupport, CartridgeType, RamType};
 
 fn main() {

@@ -1,5 +1,5 @@
 use ggbasm::parser::parse_asm;
-use ggbasm::instruction::*;
+use ggbasm::ast::*;
 
 #[test]
 fn test_empty() {

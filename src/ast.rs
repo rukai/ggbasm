@@ -1,3 +1,7 @@
+//! The AST produced by the parser.
+//!
+//! You can manually create the types below and give them to the RomBuilder via RomBuilder::add_instructions(instructions)
+
 use std::collections::HashMap;
 
 use failure::{Error, Fail, bail};
@@ -5,6 +9,12 @@ use byteorder::{LittleEndian, ByteOrder};
 
 use crate::constants::*;
 
+/// Assembly uses constant expressions to avoid copying magic numbers around.
+/// Expr represents these constant expressions.
+///
+/// The run method evaluates the constant expression.
+/// The get_2bytes, get_byte and get_bit_index evaluate the constant expression but also convert
+/// to a specific low level type needed by instructions.
 #[derive(PartialEq, Debug)]
 pub enum Expr {
     Ident (String),
@@ -17,39 +27,7 @@ impl Expr {
     pub fn binary(left: Expr, operator: BinaryOperator, right: Expr) -> Expr {
         Expr::Binary (Box::new(BinaryExpr { left, operator, right }))
     }
-}
 
-#[derive(PartialEq, Debug)]
-pub struct BinaryExpr {
-    pub left: Expr,
-    pub operator: BinaryOperator,
-    pub right: Expr,
-}
-
-#[derive(PartialEq, Debug)]
-pub struct UnaryExpr {
-    pub operator: UnaryOperator,
-    pub expr: Expr,
-}
-
-#[derive(PartialEq, Debug)]
-pub enum BinaryOperator {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    And,
-    Xor,
-    Or,
-}
-
-#[derive(PartialEq, Debug)]
-pub enum UnaryOperator {
-    Minus,
-}
-
-impl Expr {
     pub fn get_2bytes(&self, constants: &HashMap<String, i64>) -> Result<[u8; 2], ExprRunError> {
         let value = self.run(constants)?;
         if value > 0xFFFF {
@@ -162,6 +140,37 @@ pub enum ExprRunError {
     ResultDoesntFit (String),
 }
 
+
+#[derive(PartialEq, Debug)]
+pub struct BinaryExpr {
+    pub left: Expr,
+    pub operator: BinaryOperator,
+    pub right: Expr,
+}
+
+#[derive(PartialEq, Debug)]
+pub struct UnaryExpr {
+    pub operator: UnaryOperator,
+    pub expr: Expr,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum BinaryOperator {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    And,
+    Xor,
+    Or,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum UnaryOperator {
+    Minus,
+}
+
 #[derive(PartialEq, Debug)]
 pub enum Reg8 {
     A,
@@ -198,17 +207,19 @@ pub enum Flag {
     NC
 }
 
+/// The main type in the AST, the parser creates an Instruction for each line in a *.asm
+///
 /// Key:
-/// R16  - 16 bit register
-/// R8   - 8 bit register
-/// Rhl  - the hl register
-/// Ra   - the a register
-/// MR16 - 8 bit value in memory pointed at by a 16 bit register
-/// MRhl - 8 bit value in memory pointed at by the HL register
-/// MRc  - 8 bit value in memory pointed at by 0xFF + the register C
-/// I8   - immediate 8 bit value
-/// I16  - immediate 16 bit value
-/// Bit  - an index to a bit
+/// *   R16  - 16 bit register
+/// *   R8   - 8 bit register
+/// *   Rhl  - the hl register
+/// *   Ra   - the a register
+/// *   MR16 - 8 bit value in memory pointed at by a 16 bit register
+/// *   MRhl - 8 bit value in memory pointed at by the HL register
+/// *   MRc  - 8 bit value in memory pointed at by 0xFF + the register C
+/// *   I8   - immediate 8 bit value
+/// *   I16  - immediate 16 bit value
+/// *   Bit  - an index to a bit
 #[derive(PartialEq, Debug)]
 pub enum Instruction {
     /// Keeping track of empty lines makes it easier to refer errors back to a line number
@@ -303,9 +314,9 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    /// Writes the instructions bytes to the passed rom
-    /// If an expr in the instruction uses an identifier than it looks up the value for it in constants
-    /// Will return Err if constants doesnt contain the required label
+    /// Writes the instructions bytes to the passed rom.
+    /// If an expr in the instruction uses an identifier than it looks up the value for it in constants.
+    /// Will return Err if constants doesn't contain the required label.
     pub fn write_to_rom(&self, rom: &mut Vec<u8>, constants: &HashMap<String, i64>) -> Result<(), Error> {
         match self {
             Instruction::AdvanceAddress (advance_address) => {
