@@ -1,3 +1,5 @@
+//! Some miscellaneous handy constants of the gameboy hardware.
+//!
 pub const CPU_SPEED_HZ:  u32 = 4_194_304;
 pub const ROM_BANK_SIZE: u32 = 0x4000;
 pub const RAM_BANK_SIZE: u32 = 0x2000;

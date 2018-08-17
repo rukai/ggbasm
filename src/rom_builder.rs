@@ -7,11 +7,25 @@ use std::collections::HashMap;
 
 use failure::Error;
 use failure::bail;
+use image;
 
 use crate::header::{Header, CartridgeType};
 use crate::instruction::{Instruction, ExprRunError, Expr};
 use crate::constants::*;
 use crate::parser;
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Color {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+}
+
+impl Color {
+    pub fn new(red: u8, green: u8, blue: u8) -> Color {
+        Color { red, green, blue }
+    }
+}
 
 pub enum Data {
     Instructions (Vec<Instruction>),
@@ -143,19 +157,48 @@ impl RomBuilder {
         }
     }
 
-    /// Includes graphics bytes in the rom generated from the provided aseprite image file.
+    /// Includes graphics bytes in the rom generated from the provided image file.
     /// The name is used to reference the address in assembly code.
     /// Returns an error if crosses rom bank boundaries
-    /// TODO: This is a stub method, its not actually implemented yet.
-    pub fn add_ase(mut self, _file_name: &str, identifier: &str) -> Result<Self, Error> {
+    /// The color_map argument specifes how to convert 24 bit rgb color values into the 2 bit color values used by the gameboy.
+    pub fn add_image(mut self, file_name: &str, identifier: &str, color_map: &HashMap<Color, u8>) -> Result<Self, Error> {
         let identifier = String::from(identifier);
         if let Some(_) = self.constants.insert(identifier.to_string(), self.address as i64) {
             // TODO: Display first usage
             bail!("Identifier {} is already used", identifier)
         }
 
-        // TODO: Actually process the *.ase file into bytes
-        let bytes = vec!(0xac, 0xea, 0xce, 0x00);
+        let path = self.root_dir.as_path().join("graphics").join(file_name);
+        let image = match image::open(path) {
+            Ok(image) => image,
+            Err(err) => bail!("Cannot read file {} because: {}", file_name, err),
+        };
+        let mut bytes = vec!();
+        let image = image.to_rgb();
+        for vert_tile in 0..(image.height() / 8) {
+            for hor_tile in 0..(image.width() / 8) {
+                for vert_line in 0..8 {
+                    let mut byte0 = 0x00;
+                    let mut byte1 = 0x00;
+                    for hor_line in 0..8 {
+                        let x = hor_tile  * 8 + hor_line;
+                        let y = vert_tile * 8 + vert_line;
+                        let rgb = image.get_pixel(x, y);
+                        let color = Color::new(rgb[0], rgb[1], rgb[2]);
+
+                        if let Some(gb_color) = color_map.get(&color) {
+                            byte0 |=  (gb_color & 0b01)       << (7 - hor_line);
+                            byte1 |= ((gb_color & 0b10) >> 1) << (7 - hor_line);
+                        }
+                        else {
+                            bail!("Color::new(0x{:x}, 0x{:x}, 0x{:x}) is not mapped to a gameboy color", color.red, color.green, color.blue);
+                        }
+                    }
+                    bytes.push(byte0);
+                    bytes.push(byte1);
+                }
+            }
+        }
         let size = bytes.len();
 
         self.data.push(DataHolder {
