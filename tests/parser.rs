@@ -1170,6 +1170,214 @@ fn test_push_pop() {
 }
 
 #[test]
+fn test_rlc() {
+    let text = r#"
+    rlc a
+    rlc b
+    rlc c
+    rlc d
+    rlc e
+    rlc h
+    rlc l
+    rlc [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::RlcR8   (Reg8::A),
+        Instruction::RlcR8   (Reg8::B),
+        Instruction::RlcR8   (Reg8::C),
+        Instruction::RlcR8   (Reg8::D),
+        Instruction::RlcR8   (Reg8::E),
+        Instruction::RlcR8   (Reg8::H),
+        Instruction::RlcR8   (Reg8::L),
+        Instruction::RlcMRhl,
+    ));
+}
+
+#[test]
+fn test_rrc() {
+    let text = r#"
+    rrc a
+    rrc b
+    rrc c
+    rrc d
+    rrc e
+    rrc h
+    rrc l
+    rrc [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::RrcR8   (Reg8::A),
+        Instruction::RrcR8   (Reg8::B),
+        Instruction::RrcR8   (Reg8::C),
+        Instruction::RrcR8   (Reg8::D),
+        Instruction::RrcR8   (Reg8::E),
+        Instruction::RrcR8   (Reg8::H),
+        Instruction::RrcR8   (Reg8::L),
+        Instruction::RrcMRhl,
+    ));
+}
+
+#[test]
+fn test_rl() {
+    let text = r#"
+    rl a
+    rl b
+    rl c
+    rl d
+    rl e
+    rl h
+    rl l
+    rl [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::RlR8   (Reg8::A),
+        Instruction::RlR8   (Reg8::B),
+        Instruction::RlR8   (Reg8::C),
+        Instruction::RlR8   (Reg8::D),
+        Instruction::RlR8   (Reg8::E),
+        Instruction::RlR8   (Reg8::H),
+        Instruction::RlR8   (Reg8::L),
+        Instruction::RlMRhl,
+    ));
+}
+
+#[test]
+fn test_rr() {
+    let text = r#"
+    rr a
+    rr b
+    rr c
+    rr d
+    rr e
+    rr h
+    rr l
+    rr [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::RrR8   (Reg8::A),
+        Instruction::RrR8   (Reg8::B),
+        Instruction::RrR8   (Reg8::C),
+        Instruction::RrR8   (Reg8::D),
+        Instruction::RrR8   (Reg8::E),
+        Instruction::RrR8   (Reg8::H),
+        Instruction::RrR8   (Reg8::L),
+        Instruction::RrMRhl,
+    ));
+}
+
+#[test]
+fn test_sla() {
+    let text = r#"
+    sla a
+    sla b
+    sla c
+    sla d
+    sla e
+    sla h
+    sla l
+    sla [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::SlaR8   (Reg8::A),
+        Instruction::SlaR8   (Reg8::B),
+        Instruction::SlaR8   (Reg8::C),
+        Instruction::SlaR8   (Reg8::D),
+        Instruction::SlaR8   (Reg8::E),
+        Instruction::SlaR8   (Reg8::H),
+        Instruction::SlaR8   (Reg8::L),
+        Instruction::SlaMRhl,
+    ));
+}
+
+#[test]
+fn test_sra() {
+    let text = r#"
+    sra a
+    sra b
+    sra c
+    sra d
+    sra e
+    sra h
+    sra l
+    sra [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::SraR8   (Reg8::A),
+        Instruction::SraR8   (Reg8::B),
+        Instruction::SraR8   (Reg8::C),
+        Instruction::SraR8   (Reg8::D),
+        Instruction::SraR8   (Reg8::E),
+        Instruction::SraR8   (Reg8::H),
+        Instruction::SraR8   (Reg8::L),
+        Instruction::SraMRhl,
+    ));
+}
+
+#[test]
+fn test_swap() {
+    let text = r#"
+    swap a
+    swap b
+    swap c
+    swap d
+    swap e
+    swap h
+    swap l
+    swap [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::SwapR8   (Reg8::A),
+        Instruction::SwapR8   (Reg8::B),
+        Instruction::SwapR8   (Reg8::C),
+        Instruction::SwapR8   (Reg8::D),
+        Instruction::SwapR8   (Reg8::E),
+        Instruction::SwapR8   (Reg8::H),
+        Instruction::SwapR8   (Reg8::L),
+        Instruction::SwapMRhl,
+    ));
+}
+
+#[test]
+fn test_srl() {
+    let text = r#"
+    srl a
+    srl b
+    srl c
+    srl d
+    srl e
+    srl h
+    srl l
+    srl [hl]
+"#;
+    let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
+    assert_eq!(result, vec!(
+        Instruction::EmptyLine,
+        Instruction::SrlR8   (Reg8::A),
+        Instruction::SrlR8   (Reg8::B),
+        Instruction::SrlR8   (Reg8::C),
+        Instruction::SrlR8   (Reg8::D),
+        Instruction::SrlR8   (Reg8::E),
+        Instruction::SrlR8   (Reg8::H),
+        Instruction::SrlR8   (Reg8::L),
+        Instruction::SrlMRhl,
+    ));
+}
+
+#[test]
 fn test_bit_bit_r8() {
     let text = r#"
     bit 2 a

@@ -305,6 +305,24 @@ pub enum Instruction {
     LdRspRhl,
     Push (Reg16Push),
     Pop  (Reg16Push),
+
+    // 0xCB prefix
+    RlcR8 (Reg8),
+    RlcMRhl,
+    RrcR8 (Reg8),
+    RrcMRhl,
+    RlR8 (Reg8),
+    RlMRhl,
+    RrR8 (Reg8),
+    RrMRhl,
+    SlaR8 (Reg8),
+    SlaMRhl,
+    SraR8 (Reg8),
+    SraMRhl,
+    SwapR8 (Reg8),
+    SwapMRhl,
+    SrlR8 (Reg8),
+    SrlMRhl,
     BitBitR8 (Expr, Reg8),
     BitBitMRhl (Expr),
     ResBitR8 (Expr, Reg8),
@@ -688,6 +706,134 @@ impl Instruction {
                     Reg16Push::AF => rom.push(0xF1),
                 }
             }
+            Instruction::RlcR8 (reg) => {
+                rom.push(0xCB);
+                match reg {
+                    Reg8::A => rom.push(0x07),
+                    Reg8::B => rom.push(0x00),
+                    Reg8::C => rom.push(0x01),
+                    Reg8::D => rom.push(0x02),
+                    Reg8::E => rom.push(0x03),
+                    Reg8::H => rom.push(0x04),
+                    Reg8::L => rom.push(0x05),
+                }
+            }
+            Instruction::RlcMRhl => {
+                rom.push(0xCB);
+                rom.push(0x06);
+            }
+            Instruction::RrcR8 (reg) => {
+                rom.push(0xCB);
+                match reg {
+                    Reg8::A => rom.push(0x0f),
+                    Reg8::B => rom.push(0x08),
+                    Reg8::C => rom.push(0x09),
+                    Reg8::D => rom.push(0x0a),
+                    Reg8::E => rom.push(0x0b),
+                    Reg8::H => rom.push(0x0c),
+                    Reg8::L => rom.push(0x0d),
+                }
+            }
+            Instruction::RrcMRhl => {
+                rom.push(0xCB);
+                rom.push(0x0E);
+            }
+            Instruction::RlR8 (reg) => {
+                rom.push(0xCB);
+                match reg {
+                    Reg8::A => rom.push(0x17),
+                    Reg8::B => rom.push(0x10),
+                    Reg8::C => rom.push(0x11),
+                    Reg8::D => rom.push(0x12),
+                    Reg8::E => rom.push(0x13),
+                    Reg8::H => rom.push(0x14),
+                    Reg8::L => rom.push(0x15),
+                }
+            }
+            Instruction::RlMRhl => {
+                rom.push(0xCB);
+                rom.push(0x16);
+            }
+            Instruction::RrR8 (reg) => {
+                rom.push(0xCB);
+                match reg {
+                    Reg8::A => rom.push(0x1f),
+                    Reg8::B => rom.push(0x18),
+                    Reg8::C => rom.push(0x19),
+                    Reg8::D => rom.push(0x1a),
+                    Reg8::E => rom.push(0x1b),
+                    Reg8::H => rom.push(0x1c),
+                    Reg8::L => rom.push(0x1d),
+                }
+            }
+            Instruction::RrMRhl => {
+                rom.push(0xCB);
+                rom.push(0x1E);
+            }
+            Instruction::SlaR8 (reg) => {
+                rom.push(0xCB);
+                match reg {
+                    Reg8::A => rom.push(0x27),
+                    Reg8::B => rom.push(0x20),
+                    Reg8::C => rom.push(0x21),
+                    Reg8::D => rom.push(0x22),
+                    Reg8::E => rom.push(0x23),
+                    Reg8::H => rom.push(0x24),
+                    Reg8::L => rom.push(0x25),
+                }
+            }
+            Instruction::SlaMRhl => {
+                rom.push(0xCB);
+                rom.push(0x26);
+            }
+            Instruction::SraR8 (reg) => {
+                rom.push(0xCB);
+                match reg {
+                    Reg8::A => rom.push(0x2f),
+                    Reg8::B => rom.push(0x28),
+                    Reg8::C => rom.push(0x29),
+                    Reg8::D => rom.push(0x2a),
+                    Reg8::E => rom.push(0x2b),
+                    Reg8::H => rom.push(0x2c),
+                    Reg8::L => rom.push(0x2d),
+                }
+            }
+            Instruction::SraMRhl => {
+                rom.push(0xCB);
+                rom.push(0x2E);
+            }
+            Instruction::SwapR8 (reg) => {
+                rom.push(0xCB);
+                match reg {
+                    Reg8::A => rom.push(0x37),
+                    Reg8::B => rom.push(0x30),
+                    Reg8::C => rom.push(0x31),
+                    Reg8::D => rom.push(0x32),
+                    Reg8::E => rom.push(0x33),
+                    Reg8::H => rom.push(0x34),
+                    Reg8::L => rom.push(0x35),
+                }
+            }
+            Instruction::SwapMRhl => {
+                rom.push(0xCB);
+                rom.push(0x36);
+            }
+            Instruction::SrlR8 (reg) => {
+                rom.push(0xCB);
+                match reg {
+                    Reg8::A => rom.push(0x3f),
+                    Reg8::B => rom.push(0x38),
+                    Reg8::C => rom.push(0x39),
+                    Reg8::D => rom.push(0x3a),
+                    Reg8::E => rom.push(0x3b),
+                    Reg8::H => rom.push(0x3c),
+                    Reg8::L => rom.push(0x3d),
+                }
+            }
+            Instruction::SrlMRhl => {
+                rom.push(0xCB);
+                rom.push(0x3E);
+            }
             Instruction::BitBitR8 (expr, reg) => {
                 rom.push(0xCB);
                 let byte = 0x40                                    // 0b11000000
@@ -825,8 +971,24 @@ impl Instruction {
             Instruction::BitBitMRhl (_)  => 2,
             Instruction::ResBitR8 (_, _) => 2,
             Instruction::ResBitMRhl (_)  => 2,
-            Instruction::SetBitR8 (_, _)   => 2,
-            Instruction::SetBitMRhl (_)    => 2,
+            Instruction::SetBitR8 (_, _) => 2,
+            Instruction::SetBitMRhl (_)  => 2,
+            Instruction::RlcR8 (_)       => 2,
+            Instruction::RlcMRhl         => 2,
+            Instruction::RrcR8 (_)       => 2,
+            Instruction::RrcMRhl         => 2,
+            Instruction::RlR8 (_)        => 2,
+            Instruction::RlMRhl          => 2,
+            Instruction::RrR8 (_)        => 2,
+            Instruction::RrMRhl          => 2,
+            Instruction::SlaR8 (_)       => 2,
+            Instruction::SlaMRhl         => 2,
+            Instruction::SraR8 (_)       => 2,
+            Instruction::SraMRhl         => 2,
+            Instruction::SwapR8 (_)      => 2,
+            Instruction::SwapMRhl        => 2,
+            Instruction::SrlR8 (_)       => 2,
+            Instruction::SrlMRhl         => 2,
         }
     }
 }

@@ -6,9 +6,7 @@ Being a library instead of command line application, allows for an elegant combi
 *   raw bytes and instructions generated from rust code
 *   instructions read from *.asm files.
 
-## Development Status
-
-64 opcodes to go (0xCB 0x00-0x4F)
+## Rust version
 
 Requires nightly rust, because I thought it would be fun to use rust 2018 and I didn't realize I would make progress this quickly >.>
 

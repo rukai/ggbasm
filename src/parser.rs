@@ -827,6 +827,118 @@ named!(instruction<CompleteStr, Instruction>,
             (Instruction::Pop (reg))
         ) |
         do_parse!(
+            tag_no_case!("rlc") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::RlcR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("rlc") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::RlcMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("rrc") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::RrcR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("rrc") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::RrcMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("rl") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::RlR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("rl") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::RlMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("rr") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::RrR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("rr") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::RrMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("sla") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::SlaR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("sla") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::SlaMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("sra") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::SraR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("sra") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::SraMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("swap") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::SwapR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("swap") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::SwapMRhl)
+        ) |
+        do_parse!(
+            tag_no_case!("srl") >>
+            is_a!(WHITESPACE) >>
+            reg: parse_reg_u8 >>
+            end_line >>
+            (Instruction::SrlR8 (reg))
+        ) |
+        do_parse!(
+            tag_no_case!("srl") >>
+            is_a!(WHITESPACE) >>
+            deref_hl >>
+            end_line >>
+            (Instruction::SrlMRhl)
+        ) |
+        do_parse!(
             tag_no_case!("bit") >>
             is_a!(WHITESPACE) >>
             expr: parse_expr >>
