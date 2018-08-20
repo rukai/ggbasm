@@ -4,7 +4,7 @@ use std::env;
 use std::fs::File;
 use std::fs;
 use std::io::{Read, Write};
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::collections::HashMap;
 
 use failure::Error;
@@ -15,6 +15,7 @@ use crate::header::{Header, CartridgeType};
 use crate::ast::{Instruction, ExprRunError, Expr};
 use crate::constants::*;
 use crate::parser;
+use crate::audio;
 
 /// Represents a color in modern images.
 /// Used when mapping colors from modern images to gameboy graphics.
@@ -218,6 +219,50 @@ impl RomBuilder {
 
         let prev_bank = self.get_bank();
         self.address += size as u32;
+        if prev_bank == self.get_bank() {
+            Ok(self)
+        } else {
+            bail!("The added bytes cross bank boundaries.");
+        }
+    }
+
+    /// Includes audio data generated from the provided ggbasm audio text file in the audio folder.
+    ///
+    /// The name is used to reference the address in assembly code.
+    /// Returns an error if crosses rom bank boundaries.
+    ///
+    /// TODO: Describe the format of generated images.
+    pub fn add_audio(mut self, file_name: &str, identifier: &str) -> Result<Self, Error> {
+        if let Some(_) = self.constants.insert(format!("{}Start", identifier), self.address as i64) {
+            // TODO: Display first usage
+            bail!("Identifier {} is already used", identifier)
+        }
+        let path = self.root_dir.as_path().join("audio").join(file_name);
+        let mut file = match File::open(path) {
+            Ok(file) => file,
+            Err(err) => bail!("Cannot read file {} because: {}", file_name, err),
+        };
+        let mut text = String::new();
+        file.read_to_string(&mut text)?;
+
+        let lines = audio::parse_audio_file(&text)?;
+        let bytes = audio::generate_sound(lines);
+        let size = bytes.len();
+
+        self.data.push(DataHolder {
+            data:    Data::Binary (bytes),
+            address: self.address,
+            source:  DataSource::Code,
+        });
+
+        let prev_bank = self.get_bank();
+        self.address += size as u32;
+
+        if let Some(_) = self.constants.insert(format!("{}End", identifier), self.address as i64) {
+            // TODO: Display first usage
+            bail!("Identifier {} is already used", identifier)
+        }
+
         if prev_bank == self.get_bank() {
             Ok(self)
         } else {

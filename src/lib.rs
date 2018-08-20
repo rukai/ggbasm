@@ -61,6 +61,7 @@ pub mod constants;
 pub mod header;
 pub mod ast;
 pub mod parser;
+pub mod audio;
 
 mod rom_builder;
 pub use self::rom_builder::Color;
