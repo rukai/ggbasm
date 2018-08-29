@@ -54,7 +54,6 @@
 //!
 //! Requires nightly rust, because I thought it would be fun to use rust 2018 and I didn't realize I would make progress this quickly. >.>
 
-#![feature(rust_2018_preview)]
 #![recursion_limit="1024"] // Used for large nom parsers
 
 pub mod constants;
@@ -65,4 +64,5 @@ pub mod audio;
 
 mod rom_builder;
 pub use self::rom_builder::Color;
+pub use self::rom_builder::AudioFinishAction;
 pub use self::rom_builder::RomBuilder;

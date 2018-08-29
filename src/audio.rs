@@ -35,7 +35,7 @@ use failure::{Error, bail};
 /// TODO
 ///
 /// Control lines
-/// *   wait AA - wait AA frames before continuing
+/// *   rest AA - rest AA frames before continuing
 /// *   start   - force start the song at this point, used for quick testing
 ///
 ///
@@ -52,17 +52,7 @@ use failure::{Error, bail};
 /// TODO: Maybe syntax highlighting could help make this more readable
 ///
 /// TODO: Provide a way to insert the music player instructions
-pub fn generate_sound(lines: Vec<AudioLine>) -> Vec<u8> {
-    // Each entry in the table has 8 bytes:
-    //
-    // Byte 1 - Length and Duty: FF16
-    // Byte 2 - Envelope:        FF17
-    // Byte 3 - Frequency Low:   FF18
-    // Byte 4 - Frequency High:  FF19
-    // Byte 5 - frame delay until play next entry
-    // Byte 6 - ?!?!?!?
-    // Byte 7 - ?!?!?!?
-    // Byte 8 - ?!?!?!?
+pub fn generate_audio(lines: Vec<AudioLine>) -> Vec<u8> {
     let mut result = vec!();
     for line in lines {
         match line {
@@ -80,20 +70,27 @@ pub fn generate_sound(lines: Vec<AudioLine>) -> Vec<u8> {
                 let ff19 = ((frequency >> 8) as u8 & 0b00000111)
                     | if state.enable_length { 1 } else { 0 } << 6
                     | if state.initial       { 1 } else { 0 } << 7;
-                let delay = 0x09;
+                let rest = 0x09;
 
+                result.push(0x16);
                 result.push(ff16);
+
+                result.push(0x17);
                 result.push(ff17);
+
+                result.push(0x18);
                 result.push(ff18);
+
+                result.push(0x19);
                 result.push(ff19);
-                result.push(delay);
-                result.push(0x00);
-                result.push(0x00);
-                result.push(0x00);
+
+                // stop processing and rest
+                result.push(0xFF);
+                result.push(rest);
             }
             AudioLine::Channel3 => { }
             AudioLine::Channel4 => { }
-            AudioLine::Wait (_) => { }
+            AudioLine::Rest (_) => { }
             AudioLine::Start => { }
         }
     }
@@ -107,15 +104,15 @@ pub fn parse_audio_file(text: &str) -> Result<Vec<AudioLine>, Error> {
         if tokens.len() == 0 {
             continue;
         }
-        if tokens[0].to_lowercase() == "wait" {
+        if tokens[0].to_lowercase() == "rest" {
             if let Some(value) = tokens.get(1) {
                 if let Ok(value) = value.parse() {
-                    result.push(AudioLine::Wait (value));
+                    result.push(AudioLine::Rest (value));
                 } else {
-                    bail!("wait instruction argument is not an integer");
+                    bail!("rest instruction argument is not an integer");
                 }
             } else {
-                bail!("wait instruction needs an argument");
+                bail!("rest instruction needs an argument");
             }
         } else if tokens[0].to_lowercase() == "start" {
             result.push(AudioLine::Start);
@@ -201,7 +198,7 @@ pub enum AudioLine {
     Channel2 (Channel2State),
     Channel3,
     Channel4,
-    Wait (u8),
+    Rest (u8),
     Start,
 }
 

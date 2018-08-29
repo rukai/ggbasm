@@ -232,7 +232,7 @@ impl RomBuilder {
     /// Returns an error if crosses rom bank boundaries.
     ///
     /// TODO: Describe the format of generated images.
-    pub fn add_audio(mut self, file_name: &str, identifier: &str) -> Result<Self, Error> {
+    pub fn add_audio(mut self, file_name: &str, identifier: &str, finish_action: AudioFinishAction) -> Result<Self, Error> {
         if let Some(_) = self.constants.insert(format!("{}Start", identifier), self.address as i64) {
             // TODO: Display first usage
             bail!("Identifier {} is already used", identifier)
@@ -246,7 +246,19 @@ impl RomBuilder {
         file.read_to_string(&mut text)?;
 
         let lines = audio::parse_audio_file(&text)?;
-        let bytes = audio::generate_sound(lines);
+        let mut bytes = audio::generate_audio(lines);
+
+        // TODO: EVERYTHING
+        // TODO: Need to either process this in the build stage or add a system of byte replacement in the build stage
+        match finish_action {
+            AudioFinishAction::Loop => {
+                bytes.push(0xFE);
+                bytes.push((self.address / 0x100) as u8);
+                bytes.push((self.address % 0x100) as u8);
+            }
+            _ => unimplemented!()
+        }
+
         let size = bytes.len();
 
         self.data.push(DataHolder {
@@ -646,4 +658,10 @@ impl RomBuilder {
             }
         }
     }
+}
+
+pub enum AudioFinishAction {
+    JumpTo (String),
+    Loop,
+    Stop,
 }
