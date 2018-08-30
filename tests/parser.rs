@@ -76,6 +76,9 @@ label2: ; some very important message
     nop        
 stop    
 whitespace_following: 
+xor 13   ; instructions ending with expression need to handle spaces at the end
+xor a    ; instructions ending with registers need to handle spaces at the end
+xor [hl] ; instructions ending with [hl] need to handle spaces at the end
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -103,6 +106,9 @@ whitespace_following:
         Instruction::Nop,
         Instruction::Stop,
         Instruction::Label(String::from("whitespace_following")),
+        Instruction::XorI8 (Expr::Const(13)),
+        Instruction::XorR8 (Reg8::A),
+        Instruction::XorMRhl,
     ));
 }
 
