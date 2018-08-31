@@ -1,57 +1,15 @@
-//! Generate audio data
+//! Generate audio data.
+//!
+//! Normally you only need to use the high level RomBuilder methods:
+//! RomBuilder::add_audio_data and RomBuilder::add_audio_player.
+//! So check those out first.
+//!
+//! The audio player that plays the generated audio can be found at:
+//! [audio_player.asm](https://github.com/rukai/ggbasm/blob/master/src/audio_player.asm)
 
 use failure::{Error, bail};
 
-/// ## Channel 1 format:
-///
-/// TODO
-///
-/// ## Channel 2 format:
-///
-/// *   AB:C:DD:E:FG:HI
-///
-/// Key:
-///
-/// *   A:  Note                    A-G (natural), a-g (sharp)
-/// *   B:  Octave                  1-8
-/// *   C:  Duty                    0-3
-/// *   DD: length                  0-3F
-/// *   E:  envelope initial volume 0-F
-/// *   F:  envelope argument       0-7
-/// *   G:  envelope increase       Y/N
-/// *   H:  enable length           Y/N
-/// *   I:  initial                 Y/N
-///
-/// For example:
-///
-/// *   2 D6:2:10:7:4Y:NY
-///
-/// ## Channel 3 format:
-///
-/// TODO
-///
-/// ## Channel 4 format:
-///
-/// TODO
-///
-/// Control lines
-/// *   rest AA - rest AA frames before continuing
-/// *   start   - force start the song at this point, used for quick testing
-///
-///
-///
-/// TODO: Stack channels side by side like this:
-/// CHANNEL1         CHANNEL2         CHANNEL3      CHANNEL4
-/// D6:2:10:7:4Y:NY  D6:2:10:7:4Y:NY  ...           ...
-///                  D6:2:10:7:4Y:NY
-///                  D6:2:10:7:4Y:NY
-/// D6:2:10:7:4Y:NY                 
-///                  D6:2:10:7:4Y:NY
-/// D6:2:10:7:4Y:NY  D6:2:10:7:4Y:NY
-///
-/// TODO: Maybe syntax highlighting could help make this more readable
-///
-/// TODO: Provide a way to insert the music player instructions
+/// Processes `Vec<AudioLine>` into `Vec<u8>` that can be played by the audio player
 pub fn generate_audio(lines: Vec<AudioLine>) -> Vec<u8> {
     let mut result = vec!();
     for line in lines {
@@ -97,7 +55,12 @@ pub fn generate_audio(lines: Vec<AudioLine>) -> Vec<u8> {
     result
 }
 
-pub fn parse_audio_file(text: &str) -> Result<Vec<AudioLine>, Error> {
+/// Parses `&str` into `Vec<AudioLine>`
+/// Returns `Err` if the text does not conform to the audio text format.
+///
+/// Documentation on the file format is given for RomBuilder::add_audio_data.
+/// Each AudioLine cooresponds to a line in the input file. Empty lines are skipped.
+pub fn parse_audio_text(text: &str) -> Result<Vec<AudioLine>, Error> {
     let mut result = vec!();
     for line in text.lines() {
         let tokens: Vec<&str> = line.split_whitespace().collect();
@@ -193,8 +156,9 @@ pub fn parse_audio_file(text: &str) -> Result<Vec<AudioLine>, Error> {
     Ok(result)
 }
 
+/// Represents a line from the audio file
 pub enum AudioLine {
-    Channel1,
+    Channel1, // TODO: Combine into SetRegisters(Option<Channel1State>, Option<Channel2State>, Option<Channel3State>, Option<Channel4State>),
     Channel2 (Channel2State),
     Channel3,
     Channel4,
@@ -202,6 +166,7 @@ pub enum AudioLine {
     Start,
 }
 
+/// Represents a Note to be played by a channel
 pub enum Note {
     A,
     B,
@@ -226,6 +191,7 @@ impl Note {
     }
 }
 
+/// Represents the state of channel 2
 pub struct Channel2State {
     pub note:                    Note,
     pub sharp:                   bool,
@@ -239,6 +205,7 @@ pub struct Channel2State {
     pub initial:                 bool,
 }
 
+/// Converts an octave, note and sharp into the 16 bit value the gameboy uses for frequency.
 fn note_to_frequency(octave: u8, note: &Note, sharp: bool) -> u16 {
     match (octave, note, sharp) {
         (3, Note::C, false)  => 44,
