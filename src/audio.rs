@@ -8,9 +8,34 @@
 //! [audio_player.asm](https://github.com/rukai/ggbasm/blob/master/src/audio_player.asm)
 
 use failure::{Error, bail};
+use crate::ast::{Instruction, Expr};
 
-/// Processes `Vec<AudioLine>` into `Vec<u8>` that can be played by the audio player
-pub fn generate_audio(lines: Vec<AudioLine>) -> Vec<u8> {
+/// Processes `Vec<AudioLine>` into `Vec<Instruction>` that can be played by the audio player
+/// Despite returning Instruction, the only variants used are Db* and Label.
+pub fn generate_audio_data(lines: Vec<AudioLine>) -> Result<Vec<Instruction>, Error> {
+    // Bail if a clean exit is impossible
+    let mut bad_label  = None;
+    let mut clean_exit = false;
+    for line in &lines {
+        match line {
+            AudioLine::Disable       => { clean_exit = true }
+            AudioLine::PlayFrom (_)  => { clean_exit = true }
+            AudioLine::Label (label) => {
+                clean_exit = false;
+                bad_label = Some(label.clone());
+            }
+            _ => { }
+        }
+    }
+    if !clean_exit {
+        if let Some(bad_label) = bad_label {
+            bail!("It is impossible to cleanly exit from label \"{}\". Please ensure `disable` or `playfrom song_label` is used at least once after this label.", bad_label);
+        }
+        else {
+            bail!("Audio has no labels so there is no way to use it.");
+        }
+    }
+
     let mut result = vec!();
     for line in lines {
         match line {
@@ -30,35 +55,43 @@ pub fn generate_audio(lines: Vec<AudioLine>) -> Vec<u8> {
                     | if state.initial       { 1 } else { 0 } << 7;
                 let rest = 0x09;
 
-                result.push(0x16);
-                result.push(ff16);
+                let mut chan2 = vec!();
+                chan2.push(0x16);
+                chan2.push(ff16);
 
-                result.push(0x17);
-                result.push(ff17);
+                chan2.push(0x17);
+                chan2.push(ff17);
 
-                result.push(0x18);
-                result.push(ff18);
+                chan2.push(0x18);
+                chan2.push(ff18);
 
-                result.push(0x19);
-                result.push(ff19);
+                chan2.push(0x19);
+                chan2.push(ff19);
 
                 // stop processing and rest
-                result.push(0xFF);
-                result.push(rest);
+                chan2.push(0xFF);
+                chan2.push(rest);
+                result.push(Instruction::Db(chan2));
             }
             AudioLine::Channel3 => { }
             AudioLine::Channel4 => { }
             AudioLine::Rest (_) => { }
-            AudioLine::Start => { }
+            AudioLine::Disable  => result.push(Instruction::Db (vec!(0xFC))),
+            AudioLine::PlayFrom (label) => {
+                result.push(Instruction::Db (vec!(0xFE)));
+                result.push(Instruction::DbExpr16 (Expr::Ident (label)));
+            }
+            AudioLine::Label (label) => result.push(Instruction::Label (label)),
         }
     }
-    result
+
+    Ok(result)
 }
 
 /// Parses `&str` into `Vec<AudioLine>`
 /// Returns `Err` if the text does not conform to the audio text format.
 ///
-/// Documentation on the file format is given for RomBuilder::add_audio_data.
+/// Documentation on the input format is given for RomBuilder::add_audio_data.
 /// Each AudioLine cooresponds to a line in the input file. Empty lines are skipped.
 pub fn parse_audio_text(text: &str) -> Result<Vec<AudioLine>, Error> {
     let mut result = vec!();
@@ -77,8 +110,20 @@ pub fn parse_audio_text(text: &str) -> Result<Vec<AudioLine>, Error> {
             } else {
                 bail!("rest instruction needs an argument");
             }
-        } else if tokens[0].to_lowercase() == "start" {
-            result.push(AudioLine::Start);
+        } else if tokens[0].to_lowercase() == "playfrom" {
+            if tokens.len() == 2 {
+                result.push(AudioLine::PlayFrom (tokens[1].to_string()));
+            } else {
+                bail!("Expected 1 argument for playfrom, however there is {} arguments", tokens.len());
+            }
+        } else if tokens[0].to_lowercase() == "label" {
+            if tokens.len() == 2 {
+                result.push(AudioLine::Label (tokens[1].to_string()));
+            } else {
+                bail!("Expected 1 argument for label, however there is {} arguments", tokens.len());
+            }
+        } else if tokens[0].to_lowercase() == "disable" {
+            result.push(AudioLine::Disable);
         }
         else {
             let line: Vec<char> = line.chars().collect();
@@ -162,8 +207,10 @@ pub enum AudioLine {
     Channel2 (Channel2State),
     Channel3,
     Channel4,
+    Label (String),
+    PlayFrom (String),
     Rest (u8),
-    Start,
+    Disable,
 }
 
 /// Represents a Note to be played by a channel

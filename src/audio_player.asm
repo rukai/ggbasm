@@ -25,16 +25,16 @@
 ; 0x23-0x7F invalid
 ; 0x80-0xFE - put cool commands here
 ;
-; enable/disable music:
-; 0xFC - set GGBASMMusicEnable
+; disable audio:
+; 0xFC - set GGBASMAudioEnable to 0
 ;
 ; pointer management:
 ; Use this to loop the song, chain the song across banks or lead into another song.
-; 0xFD - set GGBASMMusicBank
-; 0xFE - set GGBASMMusicPointerHi and GGBASMMusicPointerLo
+; 0xFD - set GGBASMAudioBank
+; 0xFE - set GGBASMAudioPointerHi and GGBASMAudioPointerLo
 ;
 ; stop processing commands, rest for $argument game loops:
-; 0xFF - set GGBASMMusicRest
+; 0xFF - set GGBASMAudioRest
 
 ; the commands are arranged so that only set 0xFFXX commands have the first bit 0
 ; this means we can quickly check the first bit, then use the byte as the address to write to.
@@ -53,18 +53,18 @@ InitSound:
 
     ; set sound variables
     xor a; ld a 0
-    ld [GGBASMMusicEnable] a
+    ld [GGBASMAudioEnable] a
 
     ret
 
 StepSound:
     ; enable
-    ld a [GGBASMMusicEnable]
-    and a ; cp 0
+    ld hl GGBASMAudioEnable
+    cp [hl]
     ret z
 
     ; handle rests
-    ld hl GGBASMMusicRest
+    ld hl GGBASMAudioRest
     ld a [hl]
     and a ; cp 0
     jp z doStepSound
@@ -73,13 +73,13 @@ StepSound:
     ret
 
 doStepSound:
-    ; TODO set bank to GGBASMMusicBank
+    ; TODO set bank to GGBASMAudioBank
 
-    ; get music pointer
-    ld de GGBASMMusicPointerHi
+    ; get audio pointer
+    ld de GGBASMAudioPointerHi
     ld a [de]
     ld h a
-    ld de GGBASMMusicPointerLo
+    ld de GGBASMAudioPointerLo
     ld a [de]
     ld l a
 
@@ -90,42 +90,52 @@ processCommand:
     ; load argument
     ldi a [hl]
 
-musicCommandWriteIO:
+audioCommandWriteIO:
     bit 7 c
-    jp nz musicCommands
+    jp nz audioCommands
     ld [0xFF00+c] a
     jp processCommand
 
-musicCommands:
-    ; the remaining commands match on the command so swap a and c
+audioCommands:
+    ; the remaining branches use the command so swap a and c
     ld b a
-    ld a c
-    ld c b
+    ld a c ; the command is now a
+    ld c b ; the argument is now c
 
-musicCommandRest:
+audioCommandRest:
     cp 0xFF
-    jp nz musicCommandSetPointer
+    jp nz audioCommandSetPointer
     ld a c
-    ld [GGBASMMusicRest] a
+    ld [GGBASMAudioRest] a
     jp saveProgress
 
-musicCommandSetPointer:
+audioCommandSetPointer:
     cp 0xFE
-    jp nz musicCommandFoo
-    ld l [hl]
-    ld h c
+    jp nz audioCommandSetBank
+    ld h [hl]
+    ld l c
     jp processCommand
 
-musicCommandFoo:
-    ; TODO
+audioCommandSetBank:
+    cp 0xFD
+    jp nz audioCommandDisable
+    ld a c
+    ld [GGBASMAudioBank] a
+    jp processCommand
+
+audioCommandDisable:
+    cp 0xFC
+    jp nz processCommand
+    xor a; ld a 0
+    ld [GGBASMAudioEnable] a
     jp processCommand
 
 saveProgress:
-    ; save music pointer
-    ld de GGBASMMusicPointerHi
+    ; save audio pointer
+    ld de GGBASMAudioPointerHi
     ld a h
     ld [de] a
-    ld de GGBASMMusicPointerLo
+    ld de GGBASMAudioPointerLo
     ld a l
     ld [de] a
 

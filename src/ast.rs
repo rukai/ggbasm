@@ -229,6 +229,8 @@ pub enum Instruction {
     Equ (String, Expr),
     Label (String),
     Db (Vec<u8>),
+    DbExpr8 (Expr),
+    DbExpr16 (Expr),
     Nop,
     Stop,
     Halt,
@@ -344,23 +346,25 @@ impl Instruction {
                     rom.push(0x00);
                 }
             }
-            Instruction::EmptyLine  => { }
-            Instruction::Equ (_,_)  => { }
-            Instruction::Label (_)  => { }
-            Instruction::Db (bytes) => rom.extend(bytes.iter()),
-            Instruction::Nop        => rom.push(0x00),
-            Instruction::Stop       => rom.push(0x10),
-            Instruction::Halt       => rom.extend([0x76, 0x00].iter()),
-            Instruction::Di         => rom.push(0xF3),
-            Instruction::Ei         => rom.push(0xFB),
-            Instruction::Rrca       => rom.push(0x0F),
-            Instruction::Rra        => rom.push(0x1F),
-            Instruction::Cpl        => rom.push(0x2F),
-            Instruction::Ccf        => rom.push(0x3F),
-            Instruction::Rlca       => rom.push(0x07),
-            Instruction::Rla        => rom.push(0x17),
-            Instruction::Daa        => rom.push(0x27),
-            Instruction::Scf        => rom.push(0x37),
+            Instruction::EmptyLine       => { }
+            Instruction::Equ (_,_)       => { }
+            Instruction::Label (_)       => { }
+            Instruction::Db (bytes)      => rom.extend(bytes.iter()),
+            Instruction::DbExpr8  (expr) => rom.push(expr.get_byte(constants)?),
+            Instruction::DbExpr16 (expr) => rom.extend(expr.get_2bytes(constants)?.iter()),
+            Instruction::Nop  => rom.push(0x00),
+            Instruction::Stop => rom.push(0x10),
+            Instruction::Halt => rom.extend([0x76, 0x00].iter()),
+            Instruction::Di   => rom.push(0xF3),
+            Instruction::Ei   => rom.push(0xFB),
+            Instruction::Rrca => rom.push(0x0F),
+            Instruction::Rra  => rom.push(0x1F),
+            Instruction::Cpl  => rom.push(0x2F),
+            Instruction::Ccf  => rom.push(0x3F),
+            Instruction::Rlca => rom.push(0x07),
+            Instruction::Rla  => rom.push(0x17),
+            Instruction::Daa  => rom.push(0x27),
+            Instruction::Scf  => rom.push(0x37),
             Instruction::Reti => rom.push(0xD9),
             Instruction::Ret (flag) => {
                 match flag {
@@ -891,6 +895,8 @@ impl Instruction {
             Instruction::Equ (_,_)       => 0,
             Instruction::Label (_)       => 0,
             Instruction::Db (bytes)      => bytes.len() as u16,
+            Instruction::DbExpr8 (_)     => 1,
+            Instruction::DbExpr16 (_)    => 2,
             Instruction::Nop             => 1,
             Instruction::Stop            => 1,
             Instruction::Halt            => 2,

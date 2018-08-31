@@ -64,5 +64,4 @@ pub mod audio;
 
 mod rom_builder;
 pub use self::rom_builder::Color;
-pub use self::rom_builder::AudioFinishAction;
 pub use self::rom_builder::RomBuilder;
