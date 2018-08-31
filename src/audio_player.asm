@@ -29,7 +29,7 @@
 ; 0xFC - set GGBASMAudioEnable to 0
 ;
 ; pointer management:
-; Use this to loop the song, chain the song across banks or lead into another song.
+; Use these to loop the audio, chain the audio across banks or lead into another audio.
 ; 0xFD - set GGBASMAudioBank
 ; 0xFE - set GGBASMAudioPointerHi and GGBASMAudioPointerLo
 ;

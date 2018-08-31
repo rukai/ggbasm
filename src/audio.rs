@@ -39,42 +39,104 @@ pub fn generate_audio_data(lines: Vec<AudioLine>) -> Result<Vec<Instruction>, Er
     let mut result = vec!();
     for line in lines {
         match line {
-            AudioLine::Channel1 => { }
-            AudioLine::Channel2 (state) => {
-                let frequency = note_to_frequency(state.octave, &state.note, state.sharp);
-                let length = 0x3f - state.length; // make length start at 0 and higher values mean longer length.
+            AudioLine::SetRegisters { rest, ch1, ch2, .. } => {
+                let mut bytes = vec!();
+                if let Some(state) = ch1 {
+                    // validate values
+                    if state.length > 0x3f {
+                        bail!("Length of {} is > 0x3F", state.length);
+                    }
+                    if state.duty > 3 {
+                        bail!("Duty of {} is > 3", state.duty);
+                    }
+                    if state.envelope_initial_volume > 0x0F {
+                        bail!("envelope initial volume of {} is > 0x0F", state.envelope_initial_volume);
+                    }
+                    if state.envelope_argument > 7 {
+                        bail!("envelope initial volume of {} is > 7", state.envelope_argument);
+                    }
+                    // TODO: Validate ff10 inputs
 
-                let ff16 = ((state.duty << 6 & 0b11000000))
-                           | length          & 0b00111111;
-                let ff17 = (state.envelope_initial_volume << 4)
-                    | (if state.envelope_increase { 1 } else { 0 } << 3)
-                    | (state.envelope_argument & 0b00000111);
-                let ff18 = (frequency & 0xFF) as u8;
-                let ff19 = ((frequency >> 8) as u8 & 0b00000111)
-                    | if state.enable_length { 1 } else { 0 } << 6
-                    | if state.initial       { 1 } else { 0 } << 7;
-                let rest = 0x09;
+                    // generate register values
+                    let frequency = note_to_frequency(state.octave, &state.note, state.sharp)?;
+                    let length = 0x3f - state.length; // make length start at 0 and higher values mean longer length.
 
-                let mut chan2 = vec!();
-                chan2.push(0x16);
-                chan2.push(ff16);
+                    let ff10 = 0;
+                    let ff11 = ((state.duty << 6 & 0b11000000))
+                               | length          & 0b00111111;
+                    let ff12 = (state.envelope_initial_volume << 4)
+                        | (if state.envelope_increase { 1 } else { 0 } << 3)
+                        | (state.envelope_argument & 0b00000111);
+                    let ff13 = (frequency & 0xFF) as u8;
+                    let ff14 = ((frequency >> 8) as u8 & 0b00000111)
+                        | if state.enable_length { 1 } else { 0 } << 6
+                        | if state.initial       { 1 } else { 0 } << 7;
 
-                chan2.push(0x17);
-                chan2.push(ff17);
+                    // insert command/argument pairs
+                    bytes.push(0x10);
+                    bytes.push(ff10);
 
-                chan2.push(0x18);
-                chan2.push(ff18);
+                    bytes.push(0x11);
+                    bytes.push(ff11);
 
-                chan2.push(0x19);
-                chan2.push(ff19);
+                    bytes.push(0x12);
+                    bytes.push(ff12);
+
+                    bytes.push(0x13);
+                    bytes.push(ff13);
+
+                    bytes.push(0x14);
+                    bytes.push(ff14);
+                }
+                if let Some(state) = ch2 {
+                    // validate values
+                    if state.length > 0x3f {
+                        bail!("Length of {} is > 0x3F", state.length);
+                    }
+                    if state.duty > 3 {
+                        bail!("Duty of {} is > 3", state.duty);
+                    }
+                    if state.envelope_initial_volume > 0x0F {
+                        bail!("envelope initial volume of {} is > 0x0F", state.envelope_initial_volume);
+                    }
+                    if state.envelope_argument > 7 {
+                        bail!("envelope initial volume of {} is > 7", state.envelope_argument);
+                    }
+
+                    // generate register values
+                    let frequency = note_to_frequency(state.octave, &state.note, state.sharp)?;
+                    let length = 0x3f - state.length; // make length start at 0 and higher values mean longer length.
+
+                    let ff16 = ((state.duty << 6 & 0b11000000))
+                               | length          & 0b00111111;
+                    let ff17 = (state.envelope_initial_volume << 4)
+                        | (if state.envelope_increase { 1 } else { 0 } << 3)
+                        | (state.envelope_argument & 0b00000111);
+                    let ff18 = (frequency & 0xFF) as u8;
+                    let ff19 = ((frequency >> 8) as u8 & 0b00000111)
+                        | if state.enable_length { 1 } else { 0 } << 6
+                        | if state.initial       { 1 } else { 0 } << 7;
+
+                    // insert command/argument pairs
+                    bytes.push(0x16);
+                    bytes.push(ff16);
+
+                    bytes.push(0x17);
+                    bytes.push(ff17);
+
+                    bytes.push(0x18);
+                    bytes.push(ff18);
+
+                    bytes.push(0x19);
+                    bytes.push(ff19);
+                }
 
                 // stop processing and rest
-                chan2.push(0xFF);
-                chan2.push(rest);
-                result.push(Instruction::Db(chan2));
+                bytes.push(0xFF);
+                bytes.push(rest);
+
+                result.push(Instruction::Db(bytes));
             }
-            AudioLine::Channel3 => { }
-            AudioLine::Channel4 => { }
             AudioLine::Rest (_) => { }
             AudioLine::Disable  => result.push(Instruction::Db (vec!(0xFC))),
             AudioLine::PlayFrom (label) => {
@@ -95,118 +157,199 @@ pub fn generate_audio_data(lines: Vec<AudioLine>) -> Result<Vec<Instruction>, Er
 /// Each AudioLine cooresponds to a line in the input file. Empty lines are skipped.
 pub fn parse_audio_text(text: &str) -> Result<Vec<AudioLine>, Error> {
     let mut result = vec!();
-    for line in text.lines() {
+    for (i, line) in text.lines().enumerate() {
         let tokens: Vec<&str> = line.split_whitespace().collect();
+        // empty lines for formatting are ok
         if tokens.len() == 0 {
             continue;
         }
-        if tokens[0].to_lowercase() == "rest" {
-            if let Some(value) = tokens.get(1) {
-                if let Ok(value) = value.parse() {
-                    result.push(AudioLine::Rest (value));
-                } else {
-                    bail!("rest instruction argument is not an integer");
-                }
-            } else {
-                bail!("rest instruction needs an argument");
+        let line = match parse_audio_line(line) {
+            Ok(line) => line,
+            Err(error) => {
+                bail!("Invalid command or values on line {}: {}", i + 1, error);
             }
-        } else if tokens[0].to_lowercase() == "playfrom" {
-            if tokens.len() == 2 {
-                result.push(AudioLine::PlayFrom (tokens[1].to_string()));
-            } else {
-                bail!("Expected 1 argument for playfrom, however there is {} arguments", tokens.len());
-            }
-        } else if tokens[0].to_lowercase() == "label" {
-            if tokens.len() == 2 {
-                result.push(AudioLine::Label (tokens[1].to_string()));
-            } else {
-                bail!("Expected 1 argument for label, however there is {} arguments", tokens.len());
-            }
-        } else if tokens[0].to_lowercase() == "disable" {
-            result.push(AudioLine::Disable);
-        }
-        else {
-            let line: Vec<char> = line.chars().collect();
-            // TODO
-            //if line.len() < 32 {
-            //    bail!("Line is too short for channel");
-            //}
-
-            let note = match line[0] {
-                'a' | 'A' => Note::A,
-                'b' | 'B' => Note::B,
-                'c' | 'C' => Note::C,
-                'd' | 'D' => Note::D,
-                'e' | 'E' => Note::E,
-                'f' | 'F' => Note::F,
-                'g' | 'G' => Note::G,
-                _   => bail!("Invalid character for note"),
-            };
-
-            let sharp = line[0].is_lowercase();
-
-            let octave = match line[1].to_string().parse() {
-                Ok(value) => value,
-                Err(_)    => bail!("Invalid character for octave"),
-            };
-
-            let duty = match line[3].to_string().parse() {
-                Ok(value) => value,
-                Err(_)    => bail!("Invalid character for duty"),
-            };
-
-            let length = match u8::from_str_radix(line[5..7].iter().cloned().collect::<String>().as_ref(), 16) {
-                Ok(value) => value,
-                Err(_)    => bail!("Invalid character for length"),
-            };
-
-            let envelope_initial_volume = match u8::from_str_radix(line[8].to_string().as_ref(), 16) {
-                Ok(value) => value,
-                Err(_)    => bail!("Invalid character for envelope initial volume"),
-            };
-
-            let envelope_argument = match line[10].to_string().parse() {
-                Ok(value) => value,
-                Err(_)    => bail!("Invalid character for envelope argument"),
-            };
-
-            let envelope_increase = match line[11] {
-                'Y' => true,
-                'N' => false,
-                _   => bail!("Invalid character for envelope increase"),
-            };
-
-            let enable_length = match line[13] {
-                'Y' => true,
-                'N' => false,
-                _   => bail!("Invalid character for enable length"),
-            };
-
-            let initial = match line[14] {
-                'Y' => true,
-                'N' => false,
-                _   => bail!("Invalid character for initial"),
-            };
-
-            result.push(AudioLine::Channel2 (Channel2State {
-                note, sharp, octave, duty, length,
-                envelope_initial_volume,
-                envelope_argument,
-                envelope_increase,
-                enable_length,
-                initial,
-            }));
-        }
+        };
+        result.push(line);
     }
     Ok(result)
 }
 
+fn parse_audio_line(line: &str) -> Result<AudioLine, Error> {
+    let tokens: Vec<&str> = line.split_whitespace().collect();
+    if tokens[0].to_lowercase() == "rest" {
+        if let Some(value) = tokens.get(1) {
+            if let Ok(value) = value.parse() {
+                Ok(AudioLine::Rest (value))
+            } else {
+                bail!("rest instruction argument is not an integer");
+            }
+        } else {
+            bail!("rest instruction needs an argument");
+        }
+    } else if tokens[0].to_lowercase() == "playfrom" {
+        if tokens.len() == 2 {
+            Ok(AudioLine::PlayFrom (tokens[1].to_string()))
+        } else {
+            bail!("Expected 1 argument for playfrom, however there is {} arguments", tokens.len());
+        }
+    } else if tokens[0].to_lowercase() == "label" {
+        if tokens.len() == 2 {
+            Ok(AudioLine::Label (tokens[1].to_string()))
+        } else {
+            bail!("Expected 1 argument for label, however there is {} arguments", tokens.len());
+        }
+    } else if tokens[0].to_lowercase() == "disable" {
+        Ok(AudioLine::Disable)
+    }
+    else {
+        let line: Vec<char> = line.chars().collect();
+
+        let rest = match u8::from_str_radix(line[0..2].iter().cloned().collect::<String>().as_ref(), 16) {
+            Ok(value) => value,
+            Err(_)    => bail!("Invalid character for rest"),
+        };
+
+        let ch1 = if line.len() < 23 || line[4..23].iter().all(|x| x.is_whitespace()) {
+            None
+        } else {
+            let line = &line;
+
+            // these are the only values unique to channel 1
+            let sweep_time = 0;
+            let sweep_increase = true;
+            let sweep_number = 0;
+
+            // use channel 2 logic as a base for channel 1
+            let channel2 = read_channel2(&line[4..])?;
+            Some(Channel1State {
+                note:                       channel2.note,
+                sharp:                      channel2.sharp,
+                octave:                     channel2.octave,
+                duty:                       channel2.duty,
+                length:                     channel2.length,
+                envelope_initial_volume:    channel2.envelope_initial_volume,
+                envelope_argument:          channel2.envelope_argument,
+                envelope_increase:          channel2.envelope_increase,
+                enable_length:              channel2.enable_length,
+                initial:                    channel2.initial,
+                sweep_time, sweep_increase, sweep_number,
+            })
+        };
+
+        let ch2 = if line.len() < 40 || line[25..40].iter().all(|x| x.is_whitespace()) {
+            None
+        } else {
+            Some(read_channel2(&line[25..])?)
+        };
+
+        let ch3 = if line.len() < 41 {
+            None
+        } else {
+            unimplemented!("Channel 3 and 4 are unimplemented");
+        };
+
+        let ch4 = None;
+
+        Ok(AudioLine::SetRegisters { rest, ch1, ch2, ch3, ch4 })
+    }
+}
+
+/// return (Note, sharp, octave)
+fn read_note(line: &[char]) -> Result<(Note, bool, u8), Error> {
+    let note = match line[0] {
+        'a' | 'A' => Note::A,
+        'b' | 'B' => Note::B,
+        'c' | 'C' => Note::C,
+        'd' | 'D' => Note::D,
+        'e' | 'E' => Note::E,
+        'f' | 'F' => Note::F,
+        'g' | 'G' => Note::G,
+        _   => bail!("Invalid character for note"),
+    };
+
+    let sharp = line[0].is_lowercase();
+
+    let octave = match line[1].to_string().parse() {
+        Ok(value) => value,
+        Err(_)    => bail!("Invalid character for octave"),
+    };
+
+    Ok((note, sharp, octave))
+}
+
+/// return channel 2 data
+fn read_channel2(line: &[char]) -> Result<Channel2State, Error> {
+    let (note, sharp, octave) = read_note(line)?;
+
+    let duty = match line[3].to_string().parse() {
+        Ok(value) => value,
+        Err(_)    => bail!("Invalid character for duty"),
+    };
+    if duty > 3 {
+        bail!("Duty of {} is > 3", duty);
+    }
+
+    let length = match u8::from_str_radix(line[5..7].iter().cloned().collect::<String>().as_ref(), 16) {
+        Ok(value) => value,
+        Err(_)    => bail!("Invalid character for length"),
+    };
+    if length > 0x3f {
+        bail!("Length of {} is > 0x3F", length);
+    }
+
+    let envelope_initial_volume = match u8::from_str_radix(line[8].to_string().as_ref(), 16) {
+        Ok(value) => value,
+        Err(_)    => bail!("Invalid character for envelope initial volume"),
+    };
+    if envelope_initial_volume > 0x0F {
+        bail!("envelope initial volume of {} is > 0x0F", envelope_initial_volume);
+    }
+
+    let envelope_argument = match line[10].to_string().parse() {
+        Ok(value) => value,
+        Err(_)    => bail!("Invalid character for envelope argument"),
+    };
+    if envelope_argument > 7 {
+        bail!("envelope initial volume of {} is > 7", envelope_argument);
+    }
+
+    let envelope_increase = match line[11] {
+        'Y' => true,
+        'N' => false,
+        _   => bail!("Invalid character for envelope increase"),
+    };
+
+    let enable_length = match line[13] {
+        'Y' => true,
+        'N' => false,
+        _   => bail!("Invalid character for enable length"),
+    };
+
+    let initial = match line[14] {
+        'Y' => true,
+        'N' => false,
+        _   => bail!("Invalid character for initial"),
+    };
+
+    Ok(Channel2State {
+        note, sharp, octave, duty, length,
+        envelope_initial_volume,
+        envelope_argument,
+        envelope_increase,
+        enable_length,
+        initial,
+    })
+}
+
 /// Represents a line from the audio file
 pub enum AudioLine {
-    Channel1, // TODO: Combine into SetRegisters(Option<Channel1State>, Option<Channel2State>, Option<Channel3State>, Option<Channel4State>),
-    Channel2 (Channel2State),
-    Channel3,
-    Channel4,
+    SetRegisters {
+        rest: u8,
+        ch1:  Option<Channel1State>,
+        ch2:  Option<Channel2State>,
+        ch3:  Option<Channel3State>,
+        ch4:  Option<Channel4State>,
+    },
     Label (String),
     PlayFrom (String),
     Rest (u8),
@@ -238,6 +381,23 @@ impl Note {
     }
 }
 
+/// Represents the state of channel 1
+pub struct Channel1State {
+    pub note:                    Note,
+    pub sharp:                   bool,
+    pub octave:                  u8,
+    pub duty:                    u8,
+    pub length:                  u8,
+    pub envelope_initial_volume: u8,
+    pub envelope_argument:       u8,
+    pub envelope_increase:       bool,
+    pub enable_length:           bool,
+    pub initial:                 bool,
+    pub sweep_time:              u8,
+    pub sweep_increase:          bool,
+    pub sweep_number:            u8,
+}
+
 /// Represents the state of channel 2
 pub struct Channel2State {
     pub note:                    Note,
@@ -252,9 +412,17 @@ pub struct Channel2State {
     pub initial:                 bool,
 }
 
+/// Represents the state of channel 3
+pub struct Channel3State {
+}
+
+/// Represents the state of channel 4
+pub struct Channel4State {
+}
+
 /// Converts an octave, note and sharp into the 16 bit value the gameboy uses for frequency.
-fn note_to_frequency(octave: u8, note: &Note, sharp: bool) -> u16 {
-    match (octave, note, sharp) {
+fn note_to_frequency(octave: u8, note: &Note, sharp: bool) -> Result<u16, Error> {
+    Ok(match (octave, note, sharp) {
         (3, Note::C, false)  => 44,
         (3, Note::C, true)   => 156,
         (3, Note::D, false)  => 262,
@@ -327,7 +495,7 @@ fn note_to_frequency(octave: u8, note: &Note, sharp: bool) -> u16 {
         (8, Note::A, false)  => 2011,
         (8, Note::A, true)   => 2013,
         (8, Note::B, false)  => 2015,
-        (octave, note, false) => panic!("Invalid note: {}{}", octave, note.to_string().to_uppercase()),
-        (octave, note, true)  => panic!("Invalid note: {}{}", octave, note.to_string().to_lowercase())
-    }
+        (octave, note, false) => bail!("Invalid note: {}{}", octave, note.to_string().to_uppercase()),
+        (octave, note, true)  => bail!("Invalid note: {}{}", octave, note.to_string().to_lowercase())
+    })
 }

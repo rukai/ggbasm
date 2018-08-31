@@ -232,19 +232,65 @@ impl RomBuilder {
 
     /// Includes audio data generated from the provided ggbasm audio text file in the audio folder.
     ///
-    /// The name is used to reference the address in assembly code.
     /// Returns an error if crosses rom bank boundaries.
     ///
     /// Currently only supports playing one track at a time, playing sound effects on top of
-    /// background music needs to be implemented.
+    /// background music might not be possible with the current architecture. Oops...
+    ///
+    /// # Format
+    ///
+    /// There are long lines containing the data for each sound register.
+    /// There are also various commands to e.g. set a label or continue playing from a specific label
+    ///
+    /// ```gbaudio
+    /// label my_cool_song
+    ///                      D6:2:10:7:4Y:NY
+    ///                      D6:2:10:7:4Y:NY
+    /// D6:2:10:7:4Y:NY:Y00                 
+    ///                      D6:2:10:7:4Y:NY
+    /// D6:2:10:7:4Y:NY:Y00  D6:2:10:7:4Y:NY
+    /// playfrom my_cool_song
+    /// ```
+    ///
+    /// # Channel formats
+    ///
+    /// Data for each channel is written on the same line like this:
+    ///
+    /// ```gbaudio
+    /// CHANNEL1             CHANNEL2         CHANNEL3      CHANNEL4
+    /// D6:2:10:7:4Y:NY:Y00  D6:2:10:7:4Y:NY  TODO          TODO
+    /// ```
+    ///
+    /// Only changes between lines are included in the audio data.
     ///
     /// ## Channel 1 format:
     ///
-    /// TODO
+    /// ```gbaudioformat
+    /// AB:C:DD:E:FG:HI:JKL
+    /// ```
+    ///
+    /// Key:
+    ///
+    /// *   A:  Note                    A-G (natural), a-g (sharp)
+    /// *   B:  Octave                  1-8
+    /// *   C:  Duty                    0-3
+    /// *   DD: length                  0-3F
+    /// *   E:  envelope initial volume 0-F
+    /// *   F:  envelope argument       0-7
+    /// *   G:  envelope increase       Y/N
+    /// *   H:  enable length           Y/N
+    /// *   I:  initial                 Y/N
+    /// *   J:  sweep increase          Y/N
+    /// *   K:  sweep time              0-7
+    /// *   L:  number of sweeps        0-7
+    ///
+    /// For example: `D6:2:10:7:4Y:NY:Y00`
     ///
     /// ## Channel 2 format:
     ///
-    /// *   AB:C:DD:E:FG:HI
+    /// ```gbaudioformat
+    /// AB:C:DD:E:FG:HI
+    /// ```
     ///
     /// Key:
     ///
@@ -258,9 +304,7 @@ impl RomBuilder {
     /// *   H:  enable length           Y/N
     /// *   I:  initial                 Y/N
     ///
-    /// For example:
-    ///
-    /// *   2 D6:2:10:7:4Y:NY
+    /// For example: `D6:2:10:7:4Y:NY`
     ///
     /// ## Channel 3 format:
     ///
@@ -270,23 +314,13 @@ impl RomBuilder {
     ///
     /// TODO
     ///
-    /// Control lines
+    /// # Control lines
+    ///
     /// *   rest AA - rest AA frames before continuing
     /// *   jp foo  - set the GGBASMAudio
     /// *   disable - disables audio by setting the value at GGBASMAudioEnable to 0
     ///
-    /// TODO: Stack channels side by side like this:
-    /// CHANNEL1         CHANNEL2         CHANNEL3      CHANNEL4
-    /// D6:2:10:7:4Y:NY  D6:2:10:7:4Y:NY  ...           ...
-    ///                  D6:2:10:7:4Y:NY
-    ///                  D6:2:10:7:4Y:NY
-    /// D6:2:10:7:4Y:NY                 
-    ///                  D6:2:10:7:4Y:NY
-    /// D6:2:10:7:4Y:NY  D6:2:10:7:4Y:NY
-    ///
-    /// TODO: Maybe syntax highlighting could help make this more readable
-    ///
-    /// TODO: Provide a way to insert the music player instructions
+    /// TODO: Maybe syntax highlighting could help make the audio format more readable
     pub fn add_audio_file(self, file_name: &str) -> Result<Self, Error> {
         let path = self.root_dir.as_path().join("audio").join(file_name);
         let mut file = match File::open(path) {
