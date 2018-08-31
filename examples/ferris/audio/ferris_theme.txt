@@ -1,0 +1,67 @@
+label MusicFerrisTheme
+07                       a3:0:22:F:0N:YY
+07                       c4:0:22:F:0N:YY
+07                       C4:0:22:F:0N:YY
+07                       c4:0:22:F:0N:YY
+07                       a3:0:22:F:0N:YY
+07                       a3:0:22:F:0N:NN
+
+07                       a3:0:22:F:0N:YY
+07                       C4:0:22:F:0N:YY
+07                       c4:0:22:F:0N:YY
+07                       g4:0:22:F:0N:YY
+07                       F4:0:22:F:0N:YY
+07                       a3:0:22:F:0N:NN
+
+07                       a3:0:22:F:0N:YY
+07                       c4:0:22:F:0N:YY
+07                       C4:0:22:F:0N:YY
+07                       c4:0:22:F:0N:YY
+07                       a3:0:22:F:0N:YY
+07                       a3:0:22:F:0N:NN
+
+07                       a3:0:22:F:0N:YY
+07                       C4:0:22:F:0N:YY
+07                       c4:0:22:F:0N:YY
+07                       g4:0:22:F:0N:YY
+07                       F4:0:22:F:0N:YY
+07                       a3:0:22:F:0N:NN
+
+07                       a3:0:22:F:0N:YY
+07                       c4:0:22:F:0N:YY
+07                       C4:0:22:F:0N:YY
+07                       c4:0:22:F:0N:YY
+07                       a3:0:22:F:0N:YY
+07                       a3:0:22:F:0N:NN
+
+07                       a3:0:22:F:0N:YY
+07                       C4:0:22:F:0N:YY
+07                       c4:0:22:F:0N:YY
+07                       g4:0:22:F:0N:YY
+07                       F4:0:22:F:0N:YY
+
+0e  d5:0:22:D:0N:YY:Y00  F3:0:37:F:0N:YY
+0e  C6:0:22:D:0N:YY:Y00  g3:0:37:F:0N:YY
+0e  a5:0:22:D:0N:YY:Y00  C4:0:37:F:0N:YY
+07  g5:0:22:D:0N:YY:Y00  d4:0:37:F:0N:YY
+07  f5:0:22:D:0N:YY:Y00  d4:0:37:F:0N:YY
+07  F5:0:22:D:0N:YY:Y00  C4:0:22:F:0N:YY
+07  F5:0:22:D:0N:YY:Y00  g3:0:22:F:0N:YY
+07  g5:0:22:D:0N:YY:Y00  d4:0:22:F:0N:YY
+07  g5:0:22:D:0N:YY:Y00  C4:0:22:F:0N:YY
+
+07  a5:0:3F:D:7N:YY:Y00  a3:0:22:F:0N:YY
+07  a5:0:3F:D:7N:YY:Y00  c4:0:22:F:0N:YY
+07                       C4:0:22:F:0N:YY
+07  a5:0:3F:8:4Y:YY:Y00  c4:0:22:F:0N:YY
+07                       a3:0:22:F:0N:YY
+07  a5:0:3F:5:7N:YY:Y00  a3:0:22:F:0N:NN
+
+07                       a3:0:22:F:0N:YY
+07  a5:0:3F:5:7N:YY:Y00  C4:0:22:F:0N:YY
+07                       c4:0:22:F:0N:YY
+07                       g4:0:22:F:0N:YY
+07                       F4:0:22:F:0N:YY
+07                       a3:0:22:F:0N:NN
+
+playfrom MusicFerrisTheme

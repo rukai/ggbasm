@@ -1,9 +1,30 @@
 start:
-    halt
+    ; setup interrupts
+	ei
+	ld a 0x1
+	ld [0xFF00+0xFF] a
 
-    ; because all *.asm files are imported with a bank specified by rust code,
-    ; the advance_address instruction refers to a position within the bank of the *.asm file.
-    advance_address 0x200
-the_real_start:
-    ld hl 0x413
-    jp the_real_start
+    call GGBASMAudioInit
+
+    ; start playing ferris theme
+    ld hl GGBASMAudioEnable
+    ld [hl] 0x01
+    ld hl GGBASMAudioBank
+    ld [hl] 0x00
+    ld hl GGBASMAudioPointerHi
+    ld [hl] MusicFerrisTheme / 0x100
+    ld hl GGBASMAudioPointerLo
+    ld [hl] MusicFerrisTheme % 0x100
+    ld hl GGBASMAudioRest
+    ld [hl] 0x20
+
+mainLoop:
+    call GGBASMAudioStep
+    halt
+    jp mainLoop
+
+GGBASMAudioEnable    EQU 0xC020 ; dont process music when 0 otherwise process it
+GGBASMAudioBank      EQU 0xC021 ; the bank the currently playing song is stored on
+GGBASMAudioPointerLo EQU 0xC022 ; pointer to the currently playing song
+GGBASMAudioPointerHi EQU 0xC023
+GGBASMAudioRest      EQU 0xC024 ; rest for this many steps

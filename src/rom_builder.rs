@@ -239,16 +239,17 @@ impl RomBuilder {
     ///
     /// # Format
     ///
-    /// There are long lines containing the data for each sound register.
+    /// There are long lines containing the data for each sound register and how long to wait
+    /// before running the next command.
     /// There are also various commands to e.g. set a label or continue playing from a specific label
     ///
     /// ```gbaudio
     /// label my_cool_song
-    ///                      D6:2:10:7:4Y:NY
-    ///                      D6:2:10:7:4Y:NY
-    /// D6:2:10:7:4Y:NY:Y00                 
-    ///                      D6:2:10:7:4Y:NY
-    /// D6:2:10:7:4Y:NY:Y00  D6:2:10:7:4Y:NY
+    /// 07                       D6:2:10:7:4Y:NY
+    /// 07                       D6:2:10:7:4Y:NY
+    /// 07  D6:2:10:7:4Y:NY:Y00                 
+    /// 07                       D6:2:10:7:4Y:NY
+    /// 07  D6:2:10:7:4Y:NY:Y00  D6:2:10:7:4Y:NY
     /// playfrom my_cool_song
     /// ```
     ///
@@ -257,8 +258,8 @@ impl RomBuilder {
     /// Data for each channel is written on the same line like this:
     ///
     /// ```gbaudio
-    /// CHANNEL1             CHANNEL2         CHANNEL3      CHANNEL4
-    /// D6:2:10:7:4Y:NY:Y00  D6:2:10:7:4Y:NY  TODO          TODO
+    /// RST CHANNEL1             CHANNEL2         CHANNEL3      CHANNEL4
+    /// 0F  D6:2:10:7:4Y:NY:Y00  D6:2:10:7:4Y:NY  TODO          TODO
     /// ```
     ///
     /// Only changes between lines are included in the audio data.
@@ -351,12 +352,12 @@ impl RomBuilder {
     ///
     /// This should be called once during initialization:
     /// ```asm
-    /// call InitSound
+    /// call GGBASMInitAudio
     /// ```
     ///
     /// This should be called once per frame:
     /// ```asm
-    /// call StepSound
+    /// call GGBASMStepAudio
     /// ```
     ///
     /// # RAM Locations

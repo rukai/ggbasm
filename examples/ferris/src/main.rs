@@ -24,6 +24,8 @@ fn run() -> Result<(), Error> {
         .add_basic_interrupts_and_jumps()?
         .add_header(header)?
         .add_asm_file("main.asm")?
+        .add_audio_player()?
+        .add_audio_file("ferris_theme.txt")?
         .write_to_disk("ferris.gb")?;
     Ok(())
 }

@@ -40,7 +40,7 @@
 ; this means we can quickly check the first bit, then use the byte as the address to write to.
 ; then the remaining commands can be manually checked.
 
-InitSound:
+GGBASMAudioInit:
     ; registers
     ld a 0x80 ; 0b10000000
 	ld [0xFF00+0x26] a
@@ -57,7 +57,7 @@ InitSound:
 
     ret
 
-StepSound:
+GGBASMAudioStep:
     ; enable
     ld hl GGBASMAudioEnable
     cp [hl]
@@ -67,12 +67,12 @@ StepSound:
     ld hl GGBASMAudioRest
     ld a [hl]
     and a ; cp 0
-    jp z doStepSound
+    jp z GGBASMdoStepSound
     dec [hl]
 
     ret
 
-doStepSound:
+GGBASMdoStepSound:
     ; TODO set bank to GGBASMAudioBank
 
     ; get audio pointer
@@ -83,54 +83,54 @@ doStepSound:
     ld a [de]
     ld l a
 
-processCommand:
+GGBASMprocessCommand:
     ; load command
     ldi a [hl]
     ld c a
     ; load argument
     ldi a [hl]
 
-audioCommandWriteIO:
+GGBASMaudioCommandWriteIO:
     bit 7 c
-    jp nz audioCommands
+    jp nz GGBASMaudioCommands
     ld [0xFF00+c] a
-    jp processCommand
+    jp GGBASMprocessCommand
 
-audioCommands:
+GGBASMaudioCommands:
     ; the remaining branches use the command so swap a and c
     ld b a
     ld a c ; the command is now a
     ld c b ; the argument is now c
 
-audioCommandRest:
+GGBASMaudioCommandRest:
     cp 0xFF
-    jp nz audioCommandSetPointer
+    jp nz GGBASMaudioCommandSetPointer
     ld a c
     ld [GGBASMAudioRest] a
-    jp saveProgress
+    jp GGBASMsaveProgress
 
-audioCommandSetPointer:
+GGBASMaudioCommandSetPointer:
     cp 0xFE
-    jp nz audioCommandSetBank
+    jp nz GGBASMaudioCommandSetBank
     ld h [hl]
     ld l c
-    jp processCommand
+    jp GGBASMprocessCommand
 
-audioCommandSetBank:
+GGBASMaudioCommandSetBank:
     cp 0xFD
-    jp nz audioCommandDisable
+    jp nz GGBASMaudioCommandDisable
     ld a c
     ld [GGBASMAudioBank] a
-    jp processCommand
+    jp GGBASMprocessCommand
 
-audioCommandDisable:
+GGBASMaudioCommandDisable:
     cp 0xFC
-    jp nz processCommand
+    jp nz GGBASMprocessCommand
     xor a; ld a 0
     ld [GGBASMAudioEnable] a
-    jp processCommand
+    jp GGBASMprocessCommand
 
-saveProgress:
+GGBASMsaveProgress:
     ; save audio pointer
     ld de GGBASMAudioPointerHi
     ld a h
