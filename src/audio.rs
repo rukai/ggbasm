@@ -131,14 +131,13 @@ pub fn generate_audio_data(lines: Vec<AudioLine>) -> Result<Vec<Instruction>, Er
                     bytes.push(ff19);
                 }
 
-                // stop processing and rest
                 bytes.push(0xFF);
                 bytes.push(rest);
 
                 result.push(Instruction::Db(bytes));
             }
-            AudioLine::Rest (_) => { }
-            AudioLine::Disable  => result.push(Instruction::Db (vec!(0xFC))),
+            AudioLine::Rest (rest) => result.push(Instruction::Db (vec!(0xFF, rest))),
+            AudioLine::Disable     => result.push(Instruction::Db (vec!(0xFC))),
             AudioLine::PlayFrom (label) => {
                 result.push(Instruction::Db (vec!(0xFE)));
                 result.push(Instruction::DbExpr16 (Expr::Ident (label)));
@@ -178,10 +177,10 @@ fn parse_audio_line(line: &str) -> Result<AudioLine, Error> {
     let tokens: Vec<&str> = line.split_whitespace().collect();
     if tokens[0].to_lowercase() == "rest" {
         if let Some(value) = tokens.get(1) {
-            if let Ok(value) = value.parse() {
+            if let Ok(value) = u8::from_str_radix(value, 16) {
                 Ok(AudioLine::Rest (value))
             } else {
-                bail!("rest instruction argument is not an integer");
+                bail!("rest instruction argument is not a hexadecimal integer");
             }
         } else {
             bail!("rest instruction needs an argument");
@@ -495,7 +494,7 @@ fn note_to_frequency(octave: u8, note: &Note, sharp: bool) -> Result<u16, Error>
         (8, Note::A, false)  => 2011,
         (8, Note::A, true)   => 2013,
         (8, Note::B, false)  => 2015,
-        (octave, note, false) => bail!("Invalid note: {}{}", octave, note.to_string().to_uppercase()),
-        (octave, note, true)  => bail!("Invalid note: {}{}", octave, note.to_string().to_lowercase())
+        (octave, note, false) => bail!("Invalid note: {}{}", note.to_string().to_uppercase(), octave),
+        (octave, note, true)  => bail!("Invalid note: {}{}", note.to_string().to_lowercase(), octave)
     })
 }
