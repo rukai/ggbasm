@@ -58,18 +58,18 @@ GGBASMAudioInit:
     ret
 
 GGBASMAudioStep:
-    ; enable
+    ; do nothing if disabled
     ld hl GGBASMAudioEnable
-    cp [hl]
+    ld a [hl]
+    and a ; cp 0
     ret z
 
-    ; handle rests
+    ; only decrement rest count if resting
     ld hl GGBASMAudioRest
     ld a [hl]
     and a ; cp 0
     jp z GGBASMdoStepSound
     dec [hl]
-
     ret
 
 GGBASMdoStepSound:

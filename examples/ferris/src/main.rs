@@ -26,6 +26,7 @@ fn run() -> Result<(), Error> {
         .add_asm_file("main.asm")?
         .add_audio_player()?
         .add_audio_file("ferris_theme.txt")?
+        .add_asm_file("ram.asm")?
         .write_to_disk("ferris.gb")?;
     Ok(())
 }

@@ -1,8 +1,6 @@
 start:
-    ; setup interrupts
-	ei
-	ld a 0x1
-	ld [0xFF00+0xFF] a
+    di
+    ; TODO: load graphics
 
     call GGBASMAudioInit
 
@@ -18,13 +16,16 @@ start:
     ld hl GGBASMAudioRest
     ld [hl] 0x20
 
+    ; setup interrupts
+	ei
+	ld a 0x1
+	ld [0xFF00+0xFF] a
+
 mainLoop:
     call GGBASMAudioStep
-    halt
-    jp mainLoop
 
-GGBASMAudioEnable    EQU 0xC020 ; dont process music when 0 otherwise process it
-GGBASMAudioBank      EQU 0xC021 ; the bank the currently playing song is stored on
-GGBASMAudioPointerLo EQU 0xC022 ; pointer to the currently playing song
-GGBASMAudioPointerHi EQU 0xC023
-GGBASMAudioRest      EQU 0xC024 ; rest for this many steps
+    halt
+    ; quick, draw graphics now
+    ; TODO
+
+    jp mainLoop
