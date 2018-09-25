@@ -55,7 +55,6 @@ named!(parse_u16<CompleteStr, u16>,
     )
 );
 
-
 named!(parse_constant<CompleteStr, i64>,
     alt!(
         // hexadecimal
@@ -72,40 +71,15 @@ named!(parse_constant<CompleteStr, i64>,
     )
 );
 
-named!(parse_binary_operator<CompleteStr, BinaryOperator>,
-    alt!(
-        value!(BinaryOperator::Add, tag_no_case!("+")) |
-        value!(BinaryOperator::Sub, tag_no_case!("-")) |
-        value!(BinaryOperator::Mul, tag_no_case!("*")) |
-        value!(BinaryOperator::Div, tag_no_case!("/")) |
-        value!(BinaryOperator::Rem, tag_no_case!("%")) |
-        value!(BinaryOperator::And, tag_no_case!("&")) |
-        value!(BinaryOperator::Or,  tag_no_case!("|")) |
-        value!(BinaryOperator::Xor, tag_no_case!("^"))
-    )
-);
-
 fn u16_to_vec(input: u16) -> Vec<u8> {
     let mut result = vec!();
     result.write_u16::<LittleEndian>(input).unwrap();
     result
 }
 
-// Pulled some of parse_expr into this parser to avoid infinite recursion on the left binary expr
-named!(parse_expr_no_recurse<CompleteStr, Expr>,
+named!(primary_expr<CompleteStr, Expr>,
     alt!(
-        do_parse!(
-            tag_no_case!("(") >>
-            opt!(is_a!(WHITESPACE)) >>
-            left: parse_expr_no_recurse >>
-            opt!(is_a!(WHITESPACE)) >>
-            operator: parse_binary_operator >>
-            opt!(is_a!(WHITESPACE)) >>
-            right: parse_expr >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!(")") >>
-            (Expr::binary(left, operator, right))
-        ) |
+        delimited!(char!('('), parse_expr, char!(')')) |
         do_parse!(
             value: parse_constant >>
             (Expr::Const(value))
@@ -117,19 +91,115 @@ named!(parse_expr_no_recurse<CompleteStr, Expr>,
     )
 );
 
-named!(parse_expr<CompleteStr, Expr>,
+named!(unary_expr<CompleteStr, Expr>,
     alt!(
         do_parse!(
-            left: parse_expr_no_recurse >>
-            opt!(is_a!(WHITESPACE)) >>
-            operator: parse_binary_operator >>
-            opt!(is_a!(WHITESPACE)) >>
-            right: parse_expr >>
-            (Expr::binary(left, operator, right))
+            op: alt!(
+                value!(UnaryOperator::Minus, char!('-'))
+            ) >>
+            expr: unary_expr >>
+            (Expr::unary(expr, op))
         ) |
-        parse_expr_no_recurse
+        primary_expr
     )
 );
+
+named!(mult_expr<CompleteStr, Expr>,
+    do_parse!(
+        left: unary_expr >>
+        expr: alt!(
+            do_parse!(
+                opt!(is_a!(WHITESPACE)) >>
+                op: alt!(
+                    value!(BinaryOperator::Mul, char!('*')) |
+                    value!(BinaryOperator::Div, char!('/')) |
+                    value!(BinaryOperator::Rem, char!('%'))
+                ) >>
+                opt!(is_a!(WHITESPACE)) >>
+                right: mult_expr >>
+                (Expr::binary(left.clone(), op, right))
+            ) |
+            value!(left)
+        ) >>
+        (expr)
+    )
+);
+
+named!(add_expr<CompleteStr, Expr>,
+    do_parse!(
+        left: mult_expr >>
+        expr: alt!(
+            do_parse!(
+                opt!(is_a!(WHITESPACE)) >>
+                op: alt!(
+                    value!(BinaryOperator::Add, char!('+')) |
+                    value!(BinaryOperator::Sub, char!('-'))
+                ) >>
+                opt!(is_a!(WHITESPACE)) >>
+                right: add_expr >>
+                (Expr::binary(left.clone(), op, right))
+            ) |
+            value!(left)
+        ) >>
+        (expr)
+    )
+);
+
+named!(bit_and_expr<CompleteStr, Expr>,
+    do_parse!(
+        left: add_expr >>
+        expr: alt!(
+            do_parse!(
+                opt!(is_a!(WHITESPACE)) >>
+                char!('&') >>
+                opt!(is_a!(WHITESPACE)) >>
+                right: bit_and_expr >>
+                (Expr::binary(left.clone(), BinaryOperator::And, right))
+            ) |
+            value!(left)
+        ) >>
+        (expr)
+    )
+);
+
+named!(bit_xor_expr<CompleteStr, Expr>,
+    do_parse!(
+        left: bit_and_expr >>
+        expr: alt!(
+            do_parse!(
+                opt!(is_a!(WHITESPACE)) >>
+                char!('^') >>
+                opt!(is_a!(WHITESPACE)) >>
+                right: bit_xor_expr >>
+                (Expr::binary(left.clone(), BinaryOperator::Xor, right))
+            ) |
+            value!(left)
+        ) >>
+        (expr)
+    )
+);
+
+named!(bit_or_expr<CompleteStr, Expr>,
+    do_parse!(
+        left: bit_xor_expr >>
+        expr: alt!(
+            do_parse!(
+                opt!(is_a!(WHITESPACE)) >>
+                char!('|') >>
+                opt!(is_a!(WHITESPACE)) >>
+                right: bit_or_expr >>
+                (Expr::binary(left.clone(), BinaryOperator::Or, right))
+            ) |
+            value!(left)
+        ) >>
+        (expr)
+    )
+);
+
+named!(parse_expr<CompleteStr, Expr>,
+    do_parse!(expr: bit_or_expr >> (expr))
+);
+
 
 named!(parse_reg_u8<CompleteStr, Reg8>,
     alt!(
@@ -170,13 +240,45 @@ named!(parse_flag<CompleteStr, Flag>,
     )
 );
 
-// rgbds seem to use an "a" in add, sub etc. fairly unpredictably.
-// So I just made it optional instead of enforcing arbitrary rules.
-named!(reg_a<CompleteStr, CompleteStr>,
+named!(comma_sep<CompleteStr, ()>,
     do_parse!(
-        a : tag_no_case!("a") >>
+        // ignore trailing whitespace
+        opt!(is_a!(WHITESPACE)) >>
+        char!(',') >>
+        opt!(is_a!(WHITESPACE)) >>
+        (())
+    )
+);
+
+named!(end_line<CompleteStr, ()>,
+    do_parse!(
+        // ignore trailing whitespace
+        opt!(is_a!(WHITESPACE)) >>
+
+        // ignore comments
+        opt!(do_parse!(
+            char!(';') >>
+            opt!(is_not!("\r\n")) >>
+            (())
+        )) >>
+
+        // does the line truely end?
+        peek!(is_a!("\r\n")) >>
+        (())
+    )
+);
+
+// rgbds seems to use an "a" in add, sub etc. fairly unpredictably.
+// So I just made it optional instead of enforcing arbitrary rules.
+named!(opt_reg_a<CompleteStr, ()>,
+    do_parse!(
         is_a!(WHITESPACE) >>
-        (a)
+        opt!(do_parse!(
+            tag_no_case!("a") >>
+            comma_sep >>
+            (())
+        )) >>
+        (())
     )
 );
 
@@ -184,7 +286,8 @@ named!(reg_a<CompleteStr, CompleteStr>,
 named!(reg_a_u8<CompleteStr, Reg8>,
     alt!(
         do_parse!(
-            reg_a >>
+            tag_no_case!("a") >>
+            comma_sep >>
             reg: parse_reg_u8 >>
             (reg)
         ) |
@@ -194,23 +297,23 @@ named!(reg_a_u8<CompleteStr, Reg8>,
 
 named!(deref_hl<CompleteStr, CompleteStr>,
     do_parse!(
-        tag_no_case!("[") >>
+        char!('[') >>
         opt!(is_a!(WHITESPACE)) >>
         a : tag_no_case!("hl") >>
         opt!(is_a!(WHITESPACE)) >>
-        tag_no_case!("]") >>
+        char!(']') >>
         (a)
     )
 );
 
 named!(parse_string<CompleteStr, Vec<u8> >,
     delimited!(
-        tag!("\""),
+        char!('"'),
         do_parse!(
             value: is_not!("\r\n\"") >>
             (value.as_bytes().to_vec())
         ),
-        tag!("\"")
+        char!('"')
     )
 );
 
@@ -219,7 +322,7 @@ named!(instruction<CompleteStr, Instruction>,
         // label
         do_parse!(
             label: is_a!(IDENT) >>
-            tag!(":") >>
+            char!(':') >>
             end_line >>
             (Instruction::Label (label.to_string()))
         ) |
@@ -240,7 +343,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("db") >>
             is_a!(WHITESPACE) >>
             value: separated_nonempty_list!(
-                is_a!(WHITESPACE),
+                comma_sep,
                 alt!(
                     parse_string |
                     do_parse!(
@@ -298,7 +401,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("call") >>
             is_a!(WHITESPACE) >>
             flag: parse_flag >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             expr: parse_expr >>
             end_line >>
             (Instruction::Call (flag, expr))
@@ -328,7 +431,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("jp") >>
             is_a!(WHITESPACE) >>
             flag: parse_flag >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             expr: parse_expr >>
             end_line >>
             (Instruction::JpI16 (flag, expr))
@@ -344,7 +447,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("jr") >>
             is_a!(WHITESPACE) >>
             flag: parse_flag >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             expr: parse_expr >>
             end_line >>
             (Instruction::Jr (flag, expr))
@@ -380,16 +483,14 @@ named!(instruction<CompleteStr, Instruction>,
         ) |
         do_parse!(
             tag_no_case!("add") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             deref_hl >>
             end_line >>
             (Instruction::AddMRhl)
         ) |
         do_parse!(
             tag_no_case!("add") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             expr: parse_expr >>
             end_line >>
             (Instruction::AddI8 (expr))
@@ -398,7 +499,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("add") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("hl") >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             reg: parse_reg_u16 >>
             end_line >>
             (Instruction::AddRhlR16 (reg))
@@ -407,7 +508,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("add") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("sp") >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             expr: parse_expr >>
             end_line >>
             (Instruction::AddRspI8 (expr))
@@ -421,16 +522,14 @@ named!(instruction<CompleteStr, Instruction>,
         ) |
         do_parse!(
             tag_no_case!("sub") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             deref_hl >>
             end_line >>
             (Instruction::SubMRhl)
         ) |
         do_parse!(
             tag_no_case!("sub") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             expr: parse_expr >>
             end_line >>
             (Instruction::SubI8 (expr))
@@ -444,16 +543,14 @@ named!(instruction<CompleteStr, Instruction>,
         ) |
         do_parse!(
             tag_no_case!("and") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             deref_hl >>
             end_line >>
             (Instruction::AndMRhl)
         ) |
         do_parse!(
             tag_no_case!("and") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             expr: parse_expr >>
             end_line >>
             (Instruction::AndI8 (expr))
@@ -467,16 +564,14 @@ named!(instruction<CompleteStr, Instruction>,
         ) |
         do_parse!(
             tag_no_case!("or") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             deref_hl >>
             end_line >>
             (Instruction::OrMRhl)
         ) |
         do_parse!(
             tag_no_case!("or") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             expr: parse_expr >>
             end_line >>
             (Instruction::OrI8 (expr))
@@ -490,16 +585,14 @@ named!(instruction<CompleteStr, Instruction>,
         ) |
         do_parse!(
             tag_no_case!("adc") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             deref_hl >>
             end_line >>
             (Instruction::AdcMRhl)
         ) |
         do_parse!(
             tag_no_case!("adc") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             expr: parse_expr >>
             end_line >>
             (Instruction::AdcI8 (expr))
@@ -513,16 +606,14 @@ named!(instruction<CompleteStr, Instruction>,
         ) |
         do_parse!(
             tag_no_case!("sbc") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             deref_hl >>
             end_line >>
             (Instruction::SbcMRhl)
         ) |
         do_parse!(
             tag_no_case!("sbc") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             expr: parse_expr >>
             end_line >>
             (Instruction::SbcI8 (expr))
@@ -536,16 +627,14 @@ named!(instruction<CompleteStr, Instruction>,
         ) |
         do_parse!(
             tag_no_case!("xor") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             deref_hl >>
             end_line >>
             (Instruction::XorMRhl)
         ) |
         do_parse!(
             tag_no_case!("xor") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             expr: parse_expr >>
             end_line >>
             (Instruction::XorI8 (expr))
@@ -559,16 +648,14 @@ named!(instruction<CompleteStr, Instruction>,
         ) |
         do_parse!(
             tag_no_case!("cp") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             deref_hl >>
             end_line >>
             (Instruction::CpMRhl)
         ) |
         do_parse!(
             tag_no_case!("cp") >>
-            is_a!(WHITESPACE) >>
-            opt!(reg_a) >>
+            opt_reg_a >>
             expr: parse_expr >>
             end_line >>
             (Instruction::CpI8 (expr))
@@ -577,7 +664,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             reg1: parse_reg_u8 >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             reg2: parse_reg_u8 >>
             end_line >>
             (Instruction::LdR8R8 (reg1, reg2))
@@ -586,7 +673,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             reg1: parse_reg_u8 >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             reg2: parse_expr >>
             end_line >>
             (Instruction::LdR8I8 (reg1, reg2))
@@ -595,7 +682,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("sp") >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             tag_no_case!("hl") >>
             end_line >>
             (Instruction::LdRspRhl)
@@ -603,12 +690,12 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
-            tag_no_case!("[") >>
+            char!('[') >>
             opt!(is_a!(WHITESPACE)) >>
             expr: parse_expr >>
             opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("]") >>
-            is_a!(WHITESPACE) >>
+            char!(']') >>
+            comma_sep >>
             tag_no_case!("sp") >>
             end_line >>
             (Instruction::LdMI16Rsp (expr))
@@ -620,7 +707,7 @@ named!(instruction<CompleteStr, Instruction>,
                 value!(Instruction::LdMRbcRa, tag_no_case!("[bc]")) |
                 value!(Instruction::LdMRdeRa, tag_no_case!("[de]"))
             ) >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             tag_no_case!("a") >>
             end_line >>
             (instruction)
@@ -629,7 +716,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("a") >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             instruction: alt!(
                 value!(Instruction::LdRaMRbc, tag_no_case!("[bc]")) |
                 value!(Instruction::LdRaMRde, tag_no_case!("[de]"))
@@ -641,7 +728,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ldi") >>
             is_a!(WHITESPACE) >>
             deref_hl >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             tag_no_case!("a") >>
             end_line >>
             (Instruction::LdiMRhlRa)
@@ -650,7 +737,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ldd") >>
             is_a!(WHITESPACE) >>
             deref_hl >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             tag_no_case!("a") >>
             end_line >>
             (Instruction::LddMRhlRa)
@@ -659,7 +746,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ldi") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("a") >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             deref_hl >>
             end_line >>
             (Instruction::LdiRaMRhl)
@@ -668,7 +755,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ldd") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("a") >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             deref_hl >>
             end_line >>
             (Instruction::LddRaMRhl)
@@ -677,7 +764,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             deref_hl >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::LdMRhlR8 (reg))
@@ -686,7 +773,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             deref_hl >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             expr: parse_expr >>
             end_line >>
             (Instruction::LdMRhlI8 (expr))
@@ -695,7 +782,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             reg: parse_reg_u8 >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             deref_hl >>
             end_line >>
             (Instruction::LdR8MRhl (reg))
@@ -704,8 +791,8 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("a") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("[") >>
+            comma_sep >>
+            char!('[') >>
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("0xFF00") >>
             opt!(is_a!(WHITESPACE)) >>
@@ -713,14 +800,14 @@ named!(instruction<CompleteStr, Instruction>,
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("c") >>
             opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("]") >>
+            char!(']') >>
             end_line >>
             (Instruction::LdhRaMRc)
         ) |
         do_parse!(
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
-            tag_no_case!("[") >>
+            char!('[') >>
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("0xFF00") >>
             opt!(is_a!(WHITESPACE)) >>
@@ -728,8 +815,8 @@ named!(instruction<CompleteStr, Instruction>,
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("c") >>
             opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("]") >>
-            is_a!(WHITESPACE) >>
+            char!(']') >>
+            comma_sep >>
             tag_no_case!("a") >>
             end_line >>
             (Instruction::LdhMRcRa)
@@ -737,7 +824,7 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
-            tag_no_case!("[") >>
+            char!('[') >>
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("0xFF00") >>
             opt!(is_a!(WHITESPACE)) >>
@@ -745,8 +832,8 @@ named!(instruction<CompleteStr, Instruction>,
             opt!(is_a!(WHITESPACE)) >>
             expr: parse_expr >>
             opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("]") >>
-            is_a!(WHITESPACE) >>
+            char!(']') >>
+            comma_sep >>
             tag_no_case!("a") >>
             end_line >>
             (Instruction::LdhMI8Ra (expr))
@@ -755,8 +842,8 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("a") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("[") >>
+            comma_sep >>
+            char!('[') >>
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("0xFF00") >>
             opt!(is_a!(WHITESPACE)) >>
@@ -764,7 +851,7 @@ named!(instruction<CompleteStr, Instruction>,
             opt!(is_a!(WHITESPACE)) >>
             expr: parse_expr >>
             opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("]") >>
+            char!(']') >>
             end_line >>
             (Instruction::LdhRaMI8 (expr))
         ) |
@@ -772,7 +859,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("hl") >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             tag_no_case!("sp") >>
             opt!(is_a!(WHITESPACE)) >>
             tag_no_case!("+") >>
@@ -784,12 +871,12 @@ named!(instruction<CompleteStr, Instruction>,
         do_parse!(
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
-            tag_no_case!("[") >>
+            char!('[') >>
             opt!(is_a!(WHITESPACE)) >>
             expr: parse_expr >>
             opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("]") >>
-            is_a!(WHITESPACE) >>
+            char!(']') >>
+            comma_sep >>
             tag_no_case!("a") >>
             end_line >>
             (Instruction::LdMI16Ra (expr))
@@ -798,12 +885,12 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             tag_no_case!("a") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("[") >>
+            comma_sep >>
+            char!('[') >>
             opt!(is_a!(WHITESPACE)) >>
             expr: parse_expr >>
             opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("]") >>
+            char!(']') >>
             end_line >>
             (Instruction::LdRaMI16 (expr))
         ) |
@@ -811,7 +898,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("ld") >>
             is_a!(WHITESPACE) >>
             reg: parse_reg_u16 >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             expr: parse_expr >>
             end_line >>
             (Instruction::LdR16I16 (reg, expr))
@@ -946,7 +1033,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("bit") >>
             is_a!(WHITESPACE) >>
             expr: parse_expr >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::BitBitR8 (expr, reg))
@@ -955,7 +1042,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("bit") >>
             is_a!(WHITESPACE) >>
             expr: parse_expr >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             deref_hl >>
             end_line >>
             (Instruction::BitBitMRhl (expr))
@@ -964,7 +1051,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("res") >>
             is_a!(WHITESPACE) >>
             expr: parse_expr >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::ResBitR8 (expr, reg))
@@ -973,7 +1060,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("res") >>
             is_a!(WHITESPACE) >>
             expr: parse_expr >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             deref_hl >>
             end_line >>
             (Instruction::ResBitMRhl (expr))
@@ -982,7 +1069,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("set") >>
             is_a!(WHITESPACE) >>
             expr: parse_expr >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             reg: parse_reg_u8 >>
             end_line >>
             (Instruction::SetBitR8 (expr, reg))
@@ -991,7 +1078,7 @@ named!(instruction<CompleteStr, Instruction>,
             tag_no_case!("set") >>
             is_a!(WHITESPACE) >>
             expr: parse_expr >>
-            is_a!(WHITESPACE) >>
+            comma_sep >>
             deref_hl >>
             end_line >>
             (Instruction::SetBitMRhl (expr))
@@ -999,24 +1086,6 @@ named!(instruction<CompleteStr, Instruction>,
 
         // line containing only whitespace/empty
         value!(Instruction::EmptyLine, end_line)
-    )
-);
-
-named!(end_line<CompleteStr, ()>,
-    do_parse!(
-        // ignore trailing whitespace
-        opt!(is_a!(WHITESPACE)) >>
-
-        // ignore comments
-        opt!(do_parse!(
-            is_a!(";") >>
-            opt!(is_not!("\r\n")) >>
-            (())
-        )) >>
-
-        // does the line truely end?
-        peek!(is_a!("\r\n")) >>
-        (())
     )
 );
 

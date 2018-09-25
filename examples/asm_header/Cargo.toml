@@ -1,5 +1,3 @@
-cargo-features = ["edition"]
-
 [package]
 name = "asm_header"
 version = "0.1.0"

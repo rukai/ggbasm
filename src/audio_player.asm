@@ -42,33 +42,33 @@
 
 GGBASMAudioInit:
     ; registers
-    ld a 0x80 ; 0b10000000
-	ld [0xFF00+0x26] a
+    ld a, 0x80 ; 0b10000000
+	ld [0xFF00+0x26], a
 
-	ld a 0x77 ; 0b01110111
-	ld [0xFF00+0x24] a
+	ld a, 0x77 ; 0b01110111
+	ld [0xFF00+0x24], a
 
-    ld a 0xFF ; 0b00000010
-    ld [0xFF00+0x25] a
+    ld a, 0xFF ; 0b00000010
+    ld [0xFF00+0x25], a
 
     ; set sound variables
     xor a; ld a 0
-    ld [GGBASMAudioEnable] a
+    ld [GGBASMAudioEnable], a
 
     ret
 
 GGBASMAudioStep:
     ; do nothing if disabled
-    ld hl GGBASMAudioEnable
-    ld a [hl]
+    ld hl, GGBASMAudioEnable
+    ld a, [hl]
     and a ; cp 0
     ret z
 
     ; only decrement rest count if resting
-    ld hl GGBASMAudioRest
-    ld a [hl]
+    ld hl, GGBASMAudioRest
+    ld a, [hl]
     and a ; cp 0
-    jp z GGBASMdoStepSound
+    jp z, GGBASMdoStepSound
     dec [hl]
     ret
 
@@ -76,67 +76,67 @@ GGBASMdoStepSound:
     ; TODO set bank to GGBASMAudioBank
 
     ; get audio pointer
-    ld de GGBASMAudioPointerHi
-    ld a [de]
-    ld h a
-    ld de GGBASMAudioPointerLo
-    ld a [de]
-    ld l a
+    ld de, GGBASMAudioPointerHi
+    ld a, [de]
+    ld h, a
+    ld de, GGBASMAudioPointerLo
+    ld a, [de]
+    ld l, a
 
 GGBASMprocessCommand:
     ; load command
-    ldi a [hl]
-    ld c a
+    ldi a, [hl]
+    ld c, a
     ; load argument
-    ldi a [hl]
+    ldi a, [hl]
 
 GGBASMaudioCommandWriteIO:
-    bit 7 c
-    jp nz GGBASMaudioCommands
-    ld [0xFF00+c] a
+    bit 7, c
+    jp nz, GGBASMaudioCommands
+    ld [0xFF00+c], a
     jp GGBASMprocessCommand
 
 GGBASMaudioCommands:
     ; the remaining branches use the command so swap a and c
-    ld b a
-    ld a c ; the command is now a
-    ld c b ; the argument is now c
+    ld b, a
+    ld a, c ; the command is now a
+    ld c, b ; the argument is now c
 
 GGBASMaudioCommandRest:
     cp 0xFF
-    jp nz GGBASMaudioCommandSetPointer
-    ld a c
-    ld [GGBASMAudioRest] a
+    jp nz, GGBASMaudioCommandSetPointer
+    ld a, c
+    ld [GGBASMAudioRest], a
     jp GGBASMsaveProgress
 
 GGBASMaudioCommandSetPointer:
     cp 0xFE
-    jp nz GGBASMaudioCommandSetBank
-    ld h [hl]
-    ld l c
+    jp nz, GGBASMaudioCommandSetBank
+    ld h, [hl]
+    ld l, c
     jp GGBASMprocessCommand
 
 GGBASMaudioCommandSetBank:
     cp 0xFD
-    jp nz GGBASMaudioCommandDisable
-    ld a c
-    ld [GGBASMAudioBank] a
+    jp nz, GGBASMaudioCommandDisable
+    ld a, c
+    ld [GGBASMAudioBank], a
     jp GGBASMprocessCommand
 
 GGBASMaudioCommandDisable:
     cp 0xFC
-    jp nz GGBASMprocessCommand
+    jp nz, GGBASMprocessCommand
     xor a; ld a 0
-    ld [GGBASMAudioEnable] a
+    ld [GGBASMAudioEnable], a
     jp GGBASMprocessCommand
 
 GGBASMsaveProgress:
     ; save audio pointer
-    ld de GGBASMAudioPointerHi
-    ld a h
-    ld [de] a
-    ld de GGBASMAudioPointerLo
-    ld a l
-    ld [de] a
+    ld de, GGBASMAudioPointerHi
+    ld a, h
+    ld [de], a
+    ld de, GGBASMAudioPointerLo
+    ld a, l
+    ld [de], a
 
     ret

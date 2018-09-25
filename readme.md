@@ -46,14 +46,10 @@ Check out the [examples folder](https://github.com/rukai/ggbasm/tree/master/exam
 
 ## Comparison with [RGBDS](https://github.com/rednex/rgbds)
 
-RGBDS is the only other gameboy assembler i've used.
-I assume other assemblers are similar.
-
 *   RGBDS requires only *.asm files, while GGBASM requires *.asm, and an entire rust crate.
 *   RGBDS needs to run `RGBDS -o main.obj src/main.asm; rgblink -m game.map -n game.sym -o out.gb main.obj; rgbfix -p 0 -v out.gb` to build the rom, while GGBASM uses `cargo run` to build the rom
 *   RGBDS uses includes inside the *.asm files, while GGBASM uses rust to insert instructions and raw bytes at the correct location in the rom.
 *   GGBASM has helper functions for generating bytes such as: png_to_gb_sprite
-*   RGBDS has its own intel-like syntax, while GGBASM uses a different intel-like syntax. Changes from RGBDS are:
-    +   hexadecimal is represented as 0x2a instead of $2a
+*   RGBDS has its own intel-like syntax, GGBASM syntax uses RGBDS syntax with a few additions. Changes from RGBDS are:
+    +   hexadecimal can be represented as 0x2a as well as $2a
     +   uses `advance_address 0xYYYY` instead of `section "FOO",$HOME[$YY]`
-    +   no commas between arguments: `ld a b` instead of `ld a, b`

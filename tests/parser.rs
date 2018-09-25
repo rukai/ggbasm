@@ -79,6 +79,9 @@ whitespace_following:
 xor 13   ; instructions ending with expression need to handle spaces at the end
 xor a    ; instructions ending with registers need to handle spaces at the end
 xor [hl] ; instructions ending with [hl] need to handle spaces at the end
+xor a,42 ; minimal spaces
+xor a, 42 ; regular spaces
+xor     a   ,    42 ; lots of spaces
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -109,6 +112,9 @@ xor [hl] ; instructions ending with [hl] need to handle spaces at the end
         Instruction::XorI8 (Expr::Const(13)),
         Instruction::XorR8 (Reg8::A),
         Instruction::XorMRhl,
+        Instruction::XorI8 (Expr::Const(42)),
+        Instruction::XorI8 (Expr::Const(42)),
+        Instruction::XorI8 (Expr::Const(42)),
     ));
 }
 
@@ -152,6 +158,7 @@ fn test_simple_instructions() {
 fn test_exprs_simple() {
     let text = r#"
     jp foo_bar
+    jp -foo
     jp foo + bar
     jp foo - bar
     jp foo * bar
@@ -166,13 +173,14 @@ fn test_exprs_simple() {
     jp foo /0x40
     jp foo% bar
 
-    jp z foo_bar
-    jp z foo + bar
+    jp z, foo_bar
+    jp z, foo + bar
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
         Instruction::EmptyLine,
         Instruction::JpI16 (Flag::Always, Expr::Ident (String::from("foo_bar"))),
+        Instruction::JpI16 (Flag::Always, Expr::unary(Expr::Ident(String::from("foo")), UnaryOperator::Minus)),
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::Ident(String::from("bar")))),
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Sub, Expr::Ident(String::from("bar")))),
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Mul, Expr::Ident(String::from("bar")))),
@@ -201,13 +209,16 @@ fn test_exprs_complex() {
     jp foo * (bar + baz)
     jp (foo + bar) * baz
     jp ((foo + bar) * baz)
-    ; TODO: Order of operations
-    ;jp foo + bar * baz
-    ;jp foo * bar + baz
-    ;jp foo / bar + baz
-    ;jp foo + bar / baz
-    ;jp foo % bar + baz
-    ;jp foo + bar % baz
+    jp (foo * -bar)
+    jp ((-foo + bar) * baz)
+    jp foo + bar * baz
+    jp foo + bar / baz
+    jp foo + bar % baz
+    jp foo * bar + baz
+    jp foo / bar + baz
+    jp foo % bar + baz
+    jp foo % bar ^ baz
+    jp foo - bar & baz
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -218,15 +229,16 @@ fn test_exprs_complex() {
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Mul, Expr::binary(Expr::Ident(String::from("bar")), BinaryOperator::Add, Expr::Ident(String::from("baz"))))),
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::Ident(String::from("bar"))), BinaryOperator::Mul, Expr::Ident(String::from("baz")))),
         Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::Ident(String::from("bar"))), BinaryOperator::Mul, Expr::Ident(String::from("baz")))),
-        // TODO: Order of operations
-        //Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::binary(Expr::Ident(String::from("bar")), BinaryOperator::Mul, Expr::Ident(String::from("baz"))))),
-        Instruction::EmptyLine,
-        Instruction::EmptyLine,
-        Instruction::EmptyLine,
-        Instruction::EmptyLine,
-        Instruction::EmptyLine,
-        Instruction::EmptyLine,
-        Instruction::EmptyLine,
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Mul, Expr::unary(Expr::Ident(String::from("bar")), UnaryOperator::Minus))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::unary(Expr::Ident(String::from("foo")), UnaryOperator::Minus), BinaryOperator::Add, Expr::Ident(String::from("bar"))), BinaryOperator::Mul, Expr::Ident(String::from("baz")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::binary(Expr::Ident(String::from("bar")), BinaryOperator::Mul, Expr::Ident(String::from("baz"))))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::binary(Expr::Ident(String::from("bar")), BinaryOperator::Div, Expr::Ident(String::from("baz"))))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Add, Expr::binary(Expr::Ident(String::from("bar")), BinaryOperator::Rem, Expr::Ident(String::from("baz"))))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Mul, Expr::Ident(String::from("bar"))), BinaryOperator::Add, Expr::Ident(String::from("baz")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Div, Expr::Ident(String::from("bar"))), BinaryOperator::Add, Expr::Ident(String::from("baz")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Rem, Expr::Ident(String::from("bar"))), BinaryOperator::Add, Expr::Ident(String::from("baz")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Rem, Expr::Ident(String::from("bar"))), BinaryOperator::Xor, Expr::Ident(String::from("baz")))),
+        Instruction::JpI16 (Flag::Always, Expr::binary(Expr::binary(Expr::Ident(String::from("foo")), BinaryOperator::Sub, Expr::Ident(String::from("bar"))), BinaryOperator::And, Expr::Ident(String::from("baz")))),
     ));
 }
 
@@ -255,10 +267,10 @@ fn test_ret() {
 #[test]
 fn test_call() {
     let text = r#"
-    call Z foobar
-    call NZ 0x1337
-    call C 0
-    call NC 42
+    call Z, foobar
+    call NZ, 0x1337
+    call C, 0
+    call NC, 42
     call 413
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
@@ -297,14 +309,14 @@ fn test_db() {
     db 0xB
     db 0x00
     db 0xFF
-    db 0x04 0x13
-    db 0 1
-    db 0 0 1 2 3 4
-    db 0 0x1 2 0x3 5 0x4
+    db 0x04, 0x13
+    db 0, 1
+    db 0, 0, 1, 2, 3, 4
+    db 0, 0x1, 2, 0x3, 5, 0x4
     db "a"
     db "Hello World!"
-    db "hi" 0x13 37
-    db 4 13 "hammers"
+    db "hi", 0x13, 37
+    db 4, 13, "hammers"
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -411,10 +423,10 @@ a b c d
 fn test_jp() {
     let text = r#"
     jp 0x150
-    jp nz foo_bar
-    jp z 413
-    jp nc 1111
-    jp c 42
+    jp nz, foo_bar
+    jp z, 413
+    jp nc, 1111
+    jp c, 42
     jp hl
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
@@ -433,10 +445,10 @@ fn test_jp() {
 fn test_jr() {
     let text = r#"
     jr 0x42
-    jr nz foo_bar
-    jr z 255
-    jr nc 11
-    jr c 42
+    jr nz, foo_bar
+    jr z, 255
+    jr nc, 11
+    jr c, 42
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -520,21 +532,21 @@ fn test_add() {
     add h
     add l
 
-    add a 0xFF
-    add a [hl]
-    add a a
-    add a b
-    add a c
-    add a d
-    add a e
-    add a h
-    add a l
+    add a, 0xFF
+    add a, [hl]
+    add a, a
+    add a, b
+    add a, c
+    add a, d
+    add a, e
+    add a, h
+    add a, l
 
-    add hl bc
-    add hl de
-    add hl hl
-    add hl sp
-    add sp 2
+    add hl, bc
+    add hl, de
+    add hl, hl
+    add hl, sp
+    add sp, 2
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -580,15 +592,15 @@ fn test_sub() {
     sub h
     sub l
 
-    sub a 0xFF
-    sub a [hl]
-    sub a a
-    sub a b
-    sub a c
-    sub a d
-    sub a e
-    sub a h
-    sub a l
+    sub a, 0xFF
+    sub a, [hl]
+    sub a, a
+    sub a, b
+    sub a, c
+    sub a, d
+    sub a, e
+    sub a, h
+    sub a, l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -628,15 +640,15 @@ fn test_and() {
     and h
     and l
 
-    and a 0xFF
-    and a [hl]
-    and a a
-    and a b
-    and a c
-    and a d
-    and a e
-    and a h
-    and a l
+    and a, 0xFF
+    and a, [hl]
+    and a, a
+    and a, b
+    and a, c
+    and a, d
+    and a, e
+    and a, h
+    and a, l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -676,15 +688,15 @@ fn test_or() {
     or h
     or l
 
-    or a 0xFF
-    or a [hl]
-    or a a
-    or a b
-    or a c
-    or a d
-    or a e
-    or a h
-    or a l
+    or a, 0xFF
+    or a, [hl]
+    or a, a
+    or a, b
+    or a, c
+    or a, d
+    or a, e
+    or a, h
+    or a, l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -724,15 +736,15 @@ fn test_adc() {
     adc h
     adc l
 
-    adc a 0xFF
-    adc a [hl]
-    adc a a
-    adc a b
-    adc a c
-    adc a d
-    adc a e
-    adc a h
-    adc a l
+    adc a, 0xFF
+    adc a, [hl]
+    adc a, a
+    adc a, b
+    adc a, c
+    adc a, d
+    adc a, e
+    adc a, h
+    adc a, l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -772,15 +784,15 @@ fn test_sbc() {
     sbc h
     sbc l
 
-    sbc a 0xFF
-    sbc a [hl]
-    sbc a a
-    sbc a b
-    sbc a c
-    sbc a d
-    sbc a e
-    sbc a h
-    sbc a l
+    sbc a, 0xFF
+    sbc a, [hl]
+    sbc a, a
+    sbc a, b
+    sbc a, c
+    sbc a, d
+    sbc a, e
+    sbc a, h
+    sbc a, l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -820,15 +832,15 @@ fn test_xor() {
     xor h
     xor l
 
-    xor a 0xFF
-    xor a [hl]
-    xor a a
-    xor a b
-    xor a c
-    xor a d
-    xor a e
-    xor a h
-    xor a l
+    xor a, 0xFF
+    xor a, [hl]
+    xor a, a
+    xor a, b
+    xor a, c
+    xor a, d
+    xor a, e
+    xor a, h
+    xor a, l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -868,15 +880,15 @@ fn test_cp() {
     cp h
     cp l
 
-    cp a 0xFF
-    cp a [hl]
-    cp a a
-    cp a b
-    cp a c
-    cp a d
-    cp a e
-    cp a h
-    cp a l
+    cp a, 0xFF
+    cp a, [hl]
+    cp a, a
+    cp a, b
+    cp a, c
+    cp a, d
+    cp a, e
+    cp a, h
+    cp a, l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -906,55 +918,55 @@ fn test_cp() {
 #[test]
 fn test_ld_r8_r8() {
     let text = r#"
-    ld a a
-    ld a b
-    ld a c
-    ld a d
-    ld a e
-    ld a h
-    ld a l
-    ld b a
-    ld b b
-    ld b c
-    ld b d
-    ld b e
-    ld b h
-    ld b l
-    ld c a
-    ld c b
-    ld c c
-    ld c d
-    ld c e
-    ld c h
-    ld c l
-    ld d a
-    ld d b
-    ld d c
-    ld d d
-    ld d e
-    ld d h
-    ld d l
-    ld e a
-    ld e b
-    ld e c
-    ld e d
-    ld e e
-    ld e h
-    ld e l
-    ld h a
-    ld h b
-    ld h c
-    ld h d
-    ld h e
-    ld h h
-    ld h l
-    ld l a
-    ld l b
-    ld l c
-    ld l d
-    ld l e
-    ld l h
-    ld l l
+    ld a, a
+    ld a, b
+    ld a, c
+    ld a, d
+    ld a, e
+    ld a, h
+    ld a, l
+    ld b, a
+    ld b, b
+    ld b, c
+    ld b, d
+    ld b, e
+    ld b, h
+    ld b, l
+    ld c, a
+    ld c, b
+    ld c, c
+    ld c, d
+    ld c, e
+    ld c, h
+    ld c, l
+    ld d, a
+    ld d, b
+    ld d, c
+    ld d, d
+    ld d, e
+    ld d, h
+    ld d, l
+    ld e, a
+    ld e, b
+    ld e, c
+    ld e, d
+    ld e, e
+    ld e, h
+    ld e, l
+    ld h, a
+    ld h, b
+    ld h, c
+    ld h, d
+    ld h, e
+    ld h, h
+    ld h, l
+    ld l, a
+    ld l, b
+    ld l, c
+    ld l, d
+    ld l, e
+    ld l, h
+    ld l, l
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -1014,70 +1026,70 @@ fn test_ld_r8_r8() {
 #[test]
 fn test_ld() {
     let text = r#"
-    ld BC 0x0413
-    ld BC something
-    ld DE 0x413
-    ld HL 0x413
-    ld SP 0x413
+    ld BC, 0x0413
+    ld BC, something
+    ld DE, 0x413
+    ld HL, 0x413
+    ld SP, 0x413
 
-    ld [0x3535] sp
-    ld [ 0x3535 ] sp
-    ld [0x3535  ] sp
-    ld [    0x3535] sp
-    ld [    0x3535  ] sp
+    ld [0x3535], sp
+    ld [ 0x3535 ], sp
+    ld [0x3535  ], sp
+    ld [    0x3535], sp
+    ld [    0x3535  ], sp
 
-    ld a 0xFF
-    ld b foo
-    ld c 0x10
-    ld d 42
-    ld e 42
-    ld h 42
-    ld l 42
+    ld a, 0xFF
+    ld b, foo
+    ld c, 0x10
+    ld d, 42
+    ld e, 42
+    ld h, 42
+    ld l, 42
 
-    ld [bc] a
-    ld [de] a
-    ld a [bc]
-    ld a [de]
+    ld [bc], a
+    ld [de], a
+    ld a, [bc]
+    ld a, [de]
 
-    ldi [hl] a
-    ldd [hl] a
-    ldi a [hl]
-    ldd a [hl]
+    ldi [hl], a
+    ldd [hl], a
+    ldi a, [hl]
+    ldd a, [hl]
 
-    ld [hl] 42
+    ld [hl], 42
 
-    ld a [hl]
-    ld b [hl]
-    ld c [hl]
-    ld d [hl]
-    ld e [hl]
-    ld h [hl]
-    ld l [hl]
+    ld a, [hl]
+    ld b, [hl]
+    ld c, [hl]
+    ld d, [hl]
+    ld e, [hl]
+    ld h, [hl]
+    ld l, [hl]
 
-    ld [hl] a
-    ld [hl] b
-    ld [hl] c
-    ld [hl] d
-    ld [hl] e
-    ld [hl] h
-    ld [hl] l
+    ld [hl], a
+    ld [hl], b
+    ld [hl], c
+    ld [hl], d
+    ld [hl], e
+    ld [hl], h
+    ld [hl], l
 
-    ld [0xFF00 + 42] a
-    ld [0xFF00+42] a
-    ld a [0xFF00 + 42]
-    ld a [0xFF00+42]
+    ld [0xFF00 + 42], a
+    ld [0xFF00+42], a
+    ld a, [0xFF00 + 42]
+    ld a, [0xFF00+42]
 
-    ld [0xFF00 + c] a
-    ld [0xFF00+c] a
-    ld [  0xFF00   +   c   ] a
-    ld a [0xFF00 + c]
-    ld a [0xFF00+c]
+    ld [0xFF00 + c], a
+    ld [0xFF00+c], a
+    ld [  0xFF00   +   c   ], a
+    ld a, [0xFF00 + c]
+    ld a, [0xFF00+c]
 
-    ld hl sp+13
-    ld hl sp + 13
-    ld sp hl
-    ld [0x413] a
-    ld a [0x0413]
+    ld hl, sp+13
+    ld hl, sp + 13
+    ld sp, hl
+    ld [0x413], a
+    ld a, [0x0413]
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -1386,14 +1398,14 @@ fn test_srl() {
 #[test]
 fn test_bit_bit_r8() {
     let text = r#"
-    bit 2 a
-    bit 2 b
-    bit 2 c
-    bit 2 d
-    bit 2 e
-    bit 2 h
-    bit 2 l
-    bit 2 [hl]
+    bit 2, a
+    bit 2, b
+    bit 2, c
+    bit 2, d
+    bit 2, e
+    bit 2, h
+    bit 2, l
+    bit 2, [hl]
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -1412,14 +1424,14 @@ fn test_bit_bit_r8() {
 #[test]
 fn test_res_bit_r8() {
     let text = r#"
-    res 2 a
-    res 2 b
-    res 2 c
-    res 2 d
-    res 2 e
-    res 2 h
-    res 2 l
-    res 2 [hl]
+    res 2, a
+    res 2, b
+    res 2, c
+    res 2, d
+    res 2, e
+    res 2, h
+    res 2, l
+    res 2, [hl]
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(
@@ -1438,14 +1450,14 @@ fn test_res_bit_r8() {
 #[test]
 fn test_set_bit_r8() {
     let text = r#"
-    set 2 a
-    set 2 b
-    set 2 c
-    set 2 d
-    set 2 e
-    set 2 h
-    set 2 l
-    set 2 [hl]
+    set 2, a
+    set 2, b
+    set 2, c
+    set 2, d
+    set 2, e
+    set 2, h
+    set 2, l
+    set 2, [hl]
 "#;
     let result: Vec<Instruction> = parse_asm(text).unwrap().into_iter().map(|x| x.unwrap()).collect();
     assert_eq!(result, vec!(

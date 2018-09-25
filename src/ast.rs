@@ -15,7 +15,7 @@ use crate::constants::*;
 /// The run method evaluates the constant expression.
 /// The get_2bytes, get_byte and get_bit_index evaluate the constant expression but also convert
 /// to a specific low level type needed by instructions.
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Expr {
     Ident (String),
     Const (i64),
@@ -26,6 +26,10 @@ pub enum Expr {
 impl Expr {
     pub fn binary(left: Expr, operator: BinaryOperator, right: Expr) -> Expr {
         Expr::Binary (Box::new(BinaryExpr { left, operator, right }))
+    }
+
+    pub fn unary(expr: Expr, operator: UnaryOperator) -> Expr {
+        Expr::Unary (Box::new(UnaryExpr { expr, operator }))
     }
 
     pub fn get_2bytes(&self, constants: &HashMap<String, i64>) -> Result<[u8; 2], ExprRunError> {
@@ -141,20 +145,20 @@ pub enum ExprRunError {
 }
 
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct BinaryExpr {
     pub left: Expr,
     pub operator: BinaryOperator,
     pub right: Expr,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct UnaryExpr {
     pub operator: UnaryOperator,
     pub expr: Expr,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum BinaryOperator {
     Add,
     Sub,
@@ -166,12 +170,12 @@ pub enum BinaryOperator {
     Or,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum UnaryOperator {
     Minus,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Reg8 {
     A,
     B,
@@ -182,7 +186,7 @@ pub enum Reg8 {
     L,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Reg16 {
     BC,
     DE,
@@ -190,7 +194,7 @@ pub enum Reg16 {
     SP,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Reg16Push {
     BC,
     DE,
@@ -198,7 +202,7 @@ pub enum Reg16Push {
     AF,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Flag {
     Always,
     Z,
@@ -220,7 +224,7 @@ pub enum Flag {
 /// *   I8   - immediate 8 bit value
 /// *   I16  - immediate 16 bit value
 /// *   Bit  - an index to a bit
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Instruction {
     /// Keeping track of empty lines makes it easier to refer errors back to a line number
     EmptyLine, // TODO: Combine this and the Option returned by the parser into a new enum
