@@ -387,6 +387,10 @@ impl RomBuilder {
 
     /// Includes bytecodes generated from the provided assembly file in the gbasm folder.
     ///
+    /// TODO: Document the syntax.
+    /// Its very similar to the [RGBDS syntax](https://rednex.github.io/rgbds/gbz80.7.html) with the addition of the advance_address command.
+    /// However we should have our syntax documentation listing every instruction and every operator in rom compile time expressions.
+    ///
     /// Returns an error if crosses rom bank boundaries.
     /// Returns an error if encounters file system issues.
     pub fn add_asm_file(self, file_name: &str) -> Result<Self, Error> {
