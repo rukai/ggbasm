@@ -1,6 +1,6 @@
 [package]
 name = "ggbasm"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Rukai <rubickent@gmail.com>"]
 edition = "2018"
 license = "MIT"

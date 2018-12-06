@@ -49,10 +49,6 @@
 //!
 //! If you are after a lower level api, the [parser] and [ast] modules can be used without the RomBuilder.
 //! You can also construct the ast types yourself and give them to the RomBuilder.
-//!
-//! ## Rust version
-//!
-//! Requires nightly rust, because I thought it would be fun to use rust 2018 and I didn't realize I would make progress this quickly. >.>
 
 #![recursion_limit="1024"] // Used for large nom parsers
 
