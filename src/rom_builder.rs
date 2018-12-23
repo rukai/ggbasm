@@ -545,6 +545,7 @@ impl RomBuilder {
 
         let mut rom = vec!();
 
+        #[derive(Clone)]
         struct EquHolder<'a> {
             pub ident:  &'a String,
             pub expr:   &'a Expr,
@@ -573,20 +574,29 @@ impl RomBuilder {
             }
         }
 
-        let prev_size = equs.len();
         let constants = &mut self.constants;
         while !equs.is_empty() {
+            let prev_size = equs.len();
             let mut outer_error = None;
+            let mut missing_idents = vec!();
             equs.retain(|equ| {
                 match equ.expr.run(constants) {
                     Ok(value) => {
                         if let Some(_) = constants.insert(equ.ident.clone(), value) {
                             // TODO: Display first usage
-                            outer_error = Some(format!("Identifier {} is used twice: One usage occured in {} on line {}", &equ.ident, equ.source.to_string(), equ.line));
+                            outer_error = Some(format!("Identifier {} is declared twice: One usage occured in {} on line {}", &equ.ident, equ.source.to_string(), equ.line));
                         }
                         false
                     }
-                    Err(ExprRunError::MissingIdentifier (_)) => true,
+                    Err(ExprRunError::MissingIdentifier (ident)) => {
+                        // MissingIdentifier can mean:
+                        // *    There is a reference to an identifier that hasnt been processed yet. And it is succesfully processed later.
+                        // *    There is a reference to an identifier that hasnt been processed yet. But it turns out to be an infinite loop.
+                        // *    There is a reference to an identifier that is not declared anywhere.
+                        // We store the values so we can handle these cases after the `retain`, due to the mutable borrow.
+                        missing_idents.push((equ.clone(), ident));
+                        true
+                    }
                     Err(ExprRunError::ResultDoesntFit (error)) |
                     Err(ExprRunError::ArithmeticError (error)) => {
                         outer_error = Some(format!("Error occured in {} on line {}: {}", equ.source.to_string(), equ.line, error));
@@ -597,6 +607,22 @@ impl RomBuilder {
             if let Some(error) = outer_error {
                 bail!(error);
             }
+
+            // Check if the reason the ident was missing is because it is never declared.
+            for (missing_ident_equ, missing_ident) in missing_idents {
+                let mut found_ident = false;
+                for search_equ in &equs {
+                    if &missing_ident == search_equ.ident {
+                        found_ident = true;
+                        break
+                    }
+                }
+                if !found_ident {
+                    bail!(format!("Identifier {} is used in {} on line {} but is never declared.", missing_ident, missing_ident_equ.source.to_string(), missing_ident_equ.line));
+                }
+            }
+
+            // Generic check for an infinite loop.
             if prev_size == equs.len() {
                 let mut fail_string = String::from("Cannot resolve constants, there is an infinite loop involving the following identifiers:\n");
                 for equ in equs {
