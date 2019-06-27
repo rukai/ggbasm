@@ -3,8 +3,14 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use failure::Error;
 use failure::bail;
-use nom::*;
-use nom::types::CompleteStr;
+use nom::branch::alt;
+use nom::bytes::complete::{is_a, is_not, tag, tag_no_case, take_while_m_n};
+use nom::character::complete::{line_ending, char};
+use nom::combinator::{opt, value, map, peek};
+use nom::error::VerboseError;
+use nom::sequence::{delimited, terminated};
+use nom::multi::{many0, separated_nonempty_list};
+use nom::IResult;
 
 use crate::ast::*;
 
@@ -21,55 +27,67 @@ fn is_dec(input: char) -> bool {
     DEC.contains(input)
 }
 
-// TODO: Replace with parse_constant in db and dw, advance_address
-named!(parse_u8<CompleteStr, u8>,
-    alt!(
-        // hexadecimal
-        do_parse!(
-            tag!("0x") >>
-            value: take_while_m_n!(1, 2, is_hex) >>
-            (u8::from_str_radix(value.as_ref(), 16).unwrap())
-        ) |
-        // decimal
-        do_parse!(
-            value: take_while_m_n!(1, 3, is_dec) >>
-            (u8::from_str_radix(value.as_ref(), 10).unwrap()) // TODO: Handle 255 < x < 1000
-        )
-    )
-);
+fn parse_u8_hex<'a>(i: &'a str) -> IResult<&'a str, u8, VerboseError<&'a str>> {
+    let (i, _) = tag("0x")(i)?;
+    let (i, value) = take_while_m_n(1, 2, is_hex)(i)?;
+    let value = u8::from_str_radix(value.as_ref(), 16).unwrap();
+    Ok((i, value))
+}
+
+fn parse_u8_dec<'a>(i: &'a str) -> IResult<&'a str, u8, VerboseError<&'a str>> {
+    let (i, value) = take_while_m_n(1, 3, is_dec)(i)?;
+    let value = u8::from_str_radix(value.as_ref(), 10).unwrap(); // TODO: Handle 255 < x < 1000
+    Ok((i, value))
+}
 
 // TODO: Replace with parse_constant in db and dw, advance_address
-named!(parse_u16<CompleteStr, u16>,
-    alt!(
-        // hexadecimal
-        do_parse!(
-            tag!("0x") >>
-            value: take_while_m_n!(1, 4, is_hex) >>
-            (u16::from_str_radix(value.as_ref(), 16).unwrap())
-        ) |
-        // decimal
-        do_parse!(
-            value: take_while_m_n!(1, 5, is_dec) >>
-            (u16::from_str_radix(value.as_ref(), 10).unwrap()) // TODO: Handle 65535 < x < 100000
-        )
-    )
-);
+fn parse_u8<'a>(i: &'a str) -> IResult<&'a str, u8, VerboseError<&'a str>> {
+    alt((
+        parse_u8_hex,
+        parse_u8_dec,
+    ))(i)
+}
 
-named!(parse_constant<CompleteStr, i64>,
-    alt!(
-        // hexadecimal
-        do_parse!(
-            tag!("0x") >>
-            value: take_while_m_n!(1, 16, is_hex) >> // TODO: Make this endless, we should really handle all the num to big to parse errors in one case
-            (i64::from_str_radix(value.as_ref(), 16).unwrap())
-        ) |
-        // decimal
-        do_parse!(
-            value: take_while_m_n!(1, 20, is_dec) >> // TODO: Make this endless, we should really handle all the num to big to parse errors in one case
-            (i64::from_str_radix(value.as_ref(), 10).unwrap())
-        )
-    )
-);
+fn parse_u16_hex<'a>(i: &'a str) -> IResult<&'a str, u16, VerboseError<&'a str>> {
+    let (i, _) = tag("0x")(i)?;
+    let (i, value) = take_while_m_n(1, 4, is_hex)(i)?;
+    let value = u16::from_str_radix(value.as_ref(), 16).unwrap();
+    Ok((i, value))
+}
+
+fn parse_u16_dec<'a>(i: &'a str) -> IResult<&'a str, u16, VerboseError<&'a str>> {
+    let (i, value) = take_while_m_n(1, 5, is_dec)(i)?;
+    let value = u16::from_str_radix(value.as_ref(), 10).unwrap(); // TODO: Handle 65535 < x < 100000
+    Ok((i, value))
+}
+
+// TODO: Replace with parse_constant in db and dw, advance_address
+fn parse_u16<'a>(i: &'a str) -> IResult<&'a str, u16, VerboseError<&'a str>> {
+    alt((
+        parse_u16_hex,
+        parse_u16_dec,
+    ))(i)
+}
+
+fn parse_constant_hex<'a>(i: &'a str) -> IResult<&'a str, i64, VerboseError<&'a str>> {
+    let (i, _) = tag("0x")(i)?;
+    let (i, value) = take_while_m_n(1, 16, is_hex)(i)?; // TODO: Make this endless, we should really handle all the num to big to parse errors in one case
+    let value = i64::from_str_radix(value.as_ref(), 16).unwrap();
+    Ok((i, value))
+}
+
+fn parse_constant_dec<'a>(i: &'a str) -> IResult<&'a str, i64, VerboseError<&'a str>> {
+    let (i, value) = take_while_m_n(1, 20, is_dec)(i)?; // TODO: Make this endless, we should really handle all the num to big to parse errors in one case
+    let value = i64::from_str_radix(value.as_ref(), 10).unwrap(); // TODO: Handle 65535 < x < 100000
+    Ok((i, value))
+}
+
+fn parse_constant<'a>(i: &'a str) -> IResult<&'a str, i64, VerboseError<&'a str>> {
+    alt((
+        parse_constant_hex,
+        parse_constant_dec,
+    ))(i)
+}
 
 fn u16_to_vec(input: u16) -> Vec<u8> {
     let mut result = vec!();
@@ -77,1036 +95,1200 @@ fn u16_to_vec(input: u16) -> Vec<u8> {
     result
 }
 
-named!(primary_expr<CompleteStr, Expr>,
-    alt!(
-        delimited!(char!('('), parse_expr, char!(')')) |
-        do_parse!(
-            value: parse_constant >>
-            (Expr::Const(value))
-        ) |
-        do_parse!(
-            ident: is_a!(IDENT) >>
-            (Expr::Ident(ident.to_string()))
-        )
-    )
-);
+fn primary_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+    alt((
+        delimited(char('('), parse_expr, char(')')),
+        map(parse_constant, |value| Expr::Const(value)),
+        map(is_a(IDENT), |ident: &str| Expr::Ident(ident.to_string()))
+    ))(i)
+}
 
-named!(unary_expr<CompleteStr, Expr>,
-    alt!(
-        do_parse!(
-            op: alt!(
-                value!(UnaryOperator::Minus, char!('-'))
-            ) >>
-            expr: unary_expr >>
-            (Expr::unary(expr, op))
-        ) |
-        primary_expr
-    )
-);
+fn unary_expr_inner<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+    let (i, op) = value(UnaryOperator::Minus, char('-'))(i)?;
+    let (i, expr) = unary_expr(i)?;
+    Ok((i, Expr::unary(expr, op)))
+}
 
-named!(mult_expr<CompleteStr, Expr>,
-    do_parse!(
-        left: unary_expr >>
-        expr: alt!(
-            do_parse!(
-                opt!(is_a!(WHITESPACE)) >>
-                op: alt!(
-                    value!(BinaryOperator::Mul, char!('*')) |
-                    value!(BinaryOperator::Div, char!('/')) |
-                    value!(BinaryOperator::Rem, char!('%'))
-                ) >>
-                opt!(is_a!(WHITESPACE)) >>
-                right: mult_expr >>
-                (Expr::binary(left.clone(), op, right))
-            ) |
-            value!(left)
-        ) >>
-        (expr)
-    )
-);
+fn unary_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+    alt((
+        unary_expr_inner,
+        primary_expr,
+    ))(i)
+}
 
-named!(add_expr<CompleteStr, Expr>,
-    do_parse!(
-        left: mult_expr >>
-        expr: alt!(
-            do_parse!(
-                opt!(is_a!(WHITESPACE)) >>
-                op: alt!(
-                    value!(BinaryOperator::Add, char!('+')) |
-                    value!(BinaryOperator::Sub, char!('-'))
-                ) >>
-                opt!(is_a!(WHITESPACE)) >>
-                right: add_expr >>
-                (Expr::binary(left.clone(), op, right))
-            ) |
-            value!(left)
-        ) >>
-        (expr)
-    )
-);
+fn mult_expr_inner<'a>(i: &'a str) -> IResult<&'a str, (BinaryOperator, Expr), VerboseError<&'a str>> {
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, op) = alt((
+        value(BinaryOperator::Mul, char('*')),
+        value(BinaryOperator::Div, char('/')),
+        value(BinaryOperator::Rem, char('%'))
 
-named!(bit_and_expr<CompleteStr, Expr>,
-    do_parse!(
-        left: add_expr >>
-        expr: alt!(
-            do_parse!(
-                opt!(is_a!(WHITESPACE)) >>
-                char!('&') >>
-                opt!(is_a!(WHITESPACE)) >>
-                right: bit_and_expr >>
-                (Expr::binary(left.clone(), BinaryOperator::And, right))
-            ) |
-            value!(left)
-        ) >>
-        (expr)
-    )
-);
+    ))(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, right) = mult_expr(i)?;
+    Ok((i, (op, right)))
+}
 
-named!(bit_xor_expr<CompleteStr, Expr>,
-    do_parse!(
-        left: bit_and_expr >>
-        expr: alt!(
-            do_parse!(
-                opt!(is_a!(WHITESPACE)) >>
-                char!('^') >>
-                opt!(is_a!(WHITESPACE)) >>
-                right: bit_xor_expr >>
-                (Expr::binary(left.clone(), BinaryOperator::Xor, right))
-            ) |
-            value!(left)
-        ) >>
-        (expr)
-    )
-);
+fn mult_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+    let (i, left) = unary_expr(i)?;
+    let left2 = left.clone();
+    alt((
+        map(mult_expr_inner, move |(op, right)| Expr::binary(left2.clone(), op, right)),
+        move |i| Ok((i, left.clone()))
+    ))(i)
+}
 
-named!(bit_or_expr<CompleteStr, Expr>,
-    do_parse!(
-        left: bit_xor_expr >>
-        expr: alt!(
-            do_parse!(
-                opt!(is_a!(WHITESPACE)) >>
-                char!('|') >>
-                opt!(is_a!(WHITESPACE)) >>
-                right: bit_or_expr >>
-                (Expr::binary(left.clone(), BinaryOperator::Or, right))
-            ) |
-            value!(left)
-        ) >>
-        (expr)
-    )
-);
+fn add_expr_inner<'a>(i: &'a str) -> IResult<&'a str, (BinaryOperator, Expr), VerboseError<&'a str>> {
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, op) = alt((
+        value(BinaryOperator::Add, char('+')),
+        value(BinaryOperator::Sub, char('-'))
+    ))(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, right) = add_expr(i)?;
+    Ok((i, (op, right)))
+}
 
-named!(parse_expr<CompleteStr, Expr>,
-    do_parse!(expr: bit_or_expr >> (expr))
-);
+fn add_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+    let (i, left) = mult_expr(i)?;
+    let left2 = left.clone();
+    alt((
+        map(add_expr_inner, move |(op, right)| Expr::binary(left2.clone(), op, right)),
+        move |i| Ok((i, left.clone()))
+    ))(i)
+}
 
+fn bit_and_expr_inner<'a>(i: &'a str) -> IResult<&'a str, (BinaryOperator, Expr), VerboseError<&'a str>> {
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, op) = value(BinaryOperator::And, char('&'))(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, right) = bit_and_expr(i)?;
+    Ok((i, (op, right)))
+}
 
-named!(parse_reg_u8<CompleteStr, Reg8>,
-    alt!(
-        value!(Reg8::A, tag_no_case!("a")) |
-        value!(Reg8::B, tag_no_case!("b")) |
-        value!(Reg8::C, tag_no_case!("c")) |
-        value!(Reg8::D, tag_no_case!("d")) |
-        value!(Reg8::E, tag_no_case!("e")) |
-        value!(Reg8::H, tag_no_case!("h")) |
-        value!(Reg8::L, tag_no_case!("l"))
-    )
-);
+fn bit_and_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+    let (i, left) = add_expr(i)?;
+    let left2 = left.clone();
+    alt((
+        map(bit_and_expr_inner, move |(op, right)| Expr::binary(left2.clone(), op, right)),
+        move |i| Ok((i, left.clone()))
+    ))(i)
+}
 
-named!(parse_reg_u16<CompleteStr, Reg16>,
-    alt!(
-        value!(Reg16::BC, tag_no_case!("bc")) |
-        value!(Reg16::DE, tag_no_case!("de")) |
-        value!(Reg16::HL, tag_no_case!("hl")) |
-        value!(Reg16::SP, tag_no_case!("sp"))
-    )
-);
+fn bit_xor_expr_inner<'a>(i: &'a str) -> IResult<&'a str, (BinaryOperator, Expr), VerboseError<&'a str>> {
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, op) = value(BinaryOperator::Xor, char('^'))(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, right) = bit_xor_expr(i)?;
+    Ok((i, (op, right)))
+}
 
-named!(parse_reg_u16_push<CompleteStr, Reg16Push>,
-    alt!(
-        value!(Reg16Push::BC, tag_no_case!("bc")) |
-        value!(Reg16Push::DE, tag_no_case!("de")) |
-        value!(Reg16Push::HL, tag_no_case!("hl")) |
-        value!(Reg16Push::AF, tag_no_case!("af"))
-    )
-);
+fn bit_xor_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+    let (i, left) = bit_and_expr(i)?;
+    let left2 = left.clone();
+    alt((
+        map(bit_xor_expr_inner, move |(op, right)| Expr::binary(left2.clone(), op, right)),
+        move |i| Ok((i, left.clone()))
+    ))(i)
+}
 
-named!(parse_flag<CompleteStr, Flag>,
-    alt!(
-        value!(Flag::Z,  tag_no_case!("z")) |
-        value!(Flag::NZ, tag_no_case!("nz")) |
-        value!(Flag::C,  tag_no_case!("c")) |
-        value!(Flag::NC, tag_no_case!("nc"))
-    )
-);
+fn bit_or_expr_inner<'a>(i: &'a str) -> IResult<&'a str, (BinaryOperator, Expr), VerboseError<&'a str>> {
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, op) = value(BinaryOperator::Or, char('|'))(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, right) = bit_or_expr(i)?;
+    Ok((i, (op, right)))
+}
 
-named!(comma_sep<CompleteStr, ()>,
-    do_parse!(
-        // ignore trailing whitespace
-        opt!(is_a!(WHITESPACE)) >>
-        char!(',') >>
-        opt!(is_a!(WHITESPACE)) >>
-        (())
-    )
-);
+fn bit_or_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+    let (i, left) = bit_xor_expr(i)?;
+    let left2 = left.clone();
+    alt((
+        map(bit_or_expr_inner, move |(op, right)| Expr::binary(left2.clone(), op, right)),
+        move |i| Ok((i, left.clone()))
+    ))(i)
+}
 
-named!(end_line<CompleteStr, ()>,
-    do_parse!(
-        // ignore trailing whitespace
-        opt!(is_a!(WHITESPACE)) >>
+fn parse_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+    bit_or_expr(i)
+}
 
-        // ignore comments
-        opt!(do_parse!(
-            char!(';') >>
-            opt!(is_not!("\r\n")) >>
-            (())
-        )) >>
+fn parse_reg_u8<'a>(i: &'a str) -> IResult<&'a str, Reg8, VerboseError<&'a str>> {
+    alt((
+        value(Reg8::A, tag_no_case("a")),
+        value(Reg8::B, tag_no_case("b")),
+        value(Reg8::C, tag_no_case("c")),
+        value(Reg8::D, tag_no_case("d")),
+        value(Reg8::E, tag_no_case("e")),
+        value(Reg8::H, tag_no_case("h")),
+        value(Reg8::L, tag_no_case("l"))
+    ))(i)
+}
 
-        // does the line truely end?
-        peek!(is_a!("\r\n")) >>
-        (())
-    )
-);
+fn parse_reg_u16<'a>(i: &'a str) -> IResult<&'a str, Reg16, VerboseError<&'a str>> {
+    alt((
+        value(Reg16::BC, tag_no_case("bc")),
+        value(Reg16::DE, tag_no_case("de")),
+        value(Reg16::HL, tag_no_case("hl")),
+        value(Reg16::SP, tag_no_case("sp"))
+    ))(i)
+}
+
+fn parse_reg_u16_push<'a>(i: &'a str) -> IResult<&'a str, Reg16Push, VerboseError<&'a str>> {
+    alt((
+        value(Reg16Push::BC, tag_no_case("bc")),
+        value(Reg16Push::DE, tag_no_case("de")),
+        value(Reg16Push::HL, tag_no_case("hl")),
+        value(Reg16Push::AF, tag_no_case("af"))
+    ))(i)
+}
+
+fn parse_flag<'a>(i: &'a str) -> IResult<&'a str, Flag, VerboseError<&'a str>> {
+    alt((
+        value(Flag::Z,  tag_no_case("z")),
+        value(Flag::NZ, tag_no_case("nz")),
+        value(Flag::C,  tag_no_case("c")),
+        value(Flag::NC, tag_no_case("nc"))
+    ))(i)
+}
+
+fn comma_sep<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+    // ignore trailing whitespace
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = char(',')(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    Ok((i, ()))
+}
+
+fn comment<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+    let (i, _) = char(';')(i)?;
+    let (i, _) = opt(is_not("\r\n"))(i)?;
+
+    Ok((i, ()))
+}
+
+fn end_line<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+    // ignore trailing whitespace
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+
+    // ignore comments
+    let (i, _) = opt(comment)(i)?;
+
+    // does the line truely end?
+    peek(is_a("\r\n"))(i)?;
+
+    Ok((i, ()))
+}
+
+fn reg_a<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = comma_sep(i)?;
+    Ok((i, ()))
+}
 
 // rgbds seems to use an "a" in add, sub etc. fairly unpredictably.
 // So I just made it optional instead of enforcing arbitrary rules.
-named!(opt_reg_a<CompleteStr, ()>,
-    do_parse!(
-        is_a!(WHITESPACE) >>
-        opt!(do_parse!(
-            tag_no_case!("a") >>
-            comma_sep >>
-            (())
-        )) >>
-        (())
-    )
-);
+fn opt_reg_a<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = opt(reg_a)(i)?;
+    Ok((i, ()))
+}
+
+fn reg_a_u8_inner<'a>(i: &'a str) -> IResult<&'a str, Reg8, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = comma_sep(i)?;
+    parse_reg_u8(i)
+}
 
 // proper backtracking for optional register a followed by a real u8 register
-named!(reg_a_u8<CompleteStr, Reg8>,
-    alt!(
-        do_parse!(
-            tag_no_case!("a") >>
-            comma_sep >>
-            reg: parse_reg_u8 >>
-            (reg)
-        ) |
+fn reg_a_u8<'a>(i: &'a str) -> IResult<&'a str, Reg8, VerboseError<&'a str>> {
+    alt((
+        reg_a_u8_inner,
         parse_reg_u8
-    )
-);
+    ))(i)
+}
 
-named!(deref_hl<CompleteStr, CompleteStr>,
-    do_parse!(
-        char!('[') >>
-        opt!(is_a!(WHITESPACE)) >>
-        a : tag_no_case!("hl") >>
-        opt!(is_a!(WHITESPACE)) >>
-        char!(']') >>
-        (a)
-    )
-);
+fn deref_hl<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+    let (i, _) = char('[')(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("hl")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = char(']')(i)?;
+    Ok((i, ()))
+}
 
-named!(parse_string<CompleteStr, Vec<u8> >,
-    delimited!(
-        char!('"'),
-        do_parse!(
-            value: is_not!("\r\n\"") >>
-            (value.as_bytes().to_vec())
-        ),
-        char!('"')
-    )
-);
+fn parse_string<'a>(i: &'a str) -> IResult<&'a str, Vec<u8>, VerboseError<&'a str>> {
+    delimited(
+        char('"'),
+        map(is_not("\r\n\""), |value: &str| value.as_bytes().to_vec()),
+        char('"')
+    )(i)
+}
 
-named!(instruction<CompleteStr, Instruction>,
-    alt!(
-        // label
-        do_parse!(
-            label: is_a!(IDENT) >>
-            char!(':') >>
-            end_line >>
-            (Instruction::Label (label.to_string()))
-        ) |
+fn label<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, label) = is_a(IDENT)(i)?;
+    let (i, _) = char(':')(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Label(label.to_string())))
+}
 
-        // equ
-        do_parse!(
-            label: is_a!(IDENT) >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("EQU") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::Equ (label.to_string(), expr))
-        ) |
+fn equ<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, label) = is_a(IDENT)(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("EQU")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Equ(label.to_string(), expr)))
+}
 
-        // direct bytes
-        do_parse!(
-            tag_no_case!("db") >>
-            is_a!(WHITESPACE) >>
-            value: separated_nonempty_list!(
-                comma_sep,
-                alt!(
-                    parse_string |
-                    do_parse!(
-                        value: parse_u8 >>
-                        (vec!(value))
-                    )
-                )
-            ) >>
-            end_line >>
-            (Instruction::Db (value.iter().flatten().cloned().collect()))
-        ) |
+fn direct_bytes<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("db")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, value) = separated_nonempty_list(
+        comma_sep,
+        alt((
+            parse_string,
+            map(parse_u8, |value| vec!(value))
+        ))
+    )(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Db(value.iter().flatten().cloned().collect())))
+}
 
-        // direct words
-        do_parse!(
-            tag_no_case!("dw") >>
-            is_a!(WHITESPACE) >>
-            value: parse_u16 >>
-            end_line >>
-            (Instruction::Db (u16_to_vec(value)))
-        ) |
+fn direct_words<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("dw")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, value) = parse_u16(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Db(u16_to_vec(value))))
+}
 
-        // advance address
-        do_parse!(
-            tag_no_case!("advance_address") >>
-            is_a!(WHITESPACE) >>
-            value: parse_u16 >>
-            end_line >>
-            (Instruction::AdvanceAddress (value))
-        ) |
+fn advance_address<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("advance_address")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, value) = parse_u16(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AdvanceAddress (value)))
+}
+
+fn instruction_ret<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ret")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, flag) = parse_flag(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Ret (flag)))
+}
+
+fn instruction_call_flag<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("call")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, flag) = parse_flag(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Call (flag, expr)))
+}
+
+fn instruction_call_always<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("call")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Call (Flag::Always, expr)))
+}
+
+fn instruction_jprhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("jp")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("hl")(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::JpRhl))
+}
+
+fn instruction_jpi16_always<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("jp")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::JpI16 (Flag::Always, expr)))
+}
+
+fn instruction_jpi16_flag<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("jp")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, flag) = parse_flag(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::JpI16 (flag, expr)))
+}
+
+fn instruction_jr_always<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("jr")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Jr (Flag::Always, expr)))
+}
+
+fn instruction_jr_flag<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("jr")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, flag) = parse_flag(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Jr (flag, expr)))
+}
+
+fn instruction_inc<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("inc")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, instruction) = alt((
+        map(parse_reg_u16, |reg| Instruction::IncR16(reg)),
+        map(parse_reg_u8,  |reg| Instruction::IncR8(reg)),
+        value(Instruction::IncMRhl, deref_hl),
+    ))(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, instruction))
+}
+
+fn instruction_dec<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("dec")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, instruction) = alt((
+        map(parse_reg_u16, |reg| Instruction::DecR16(reg)),
+        map(parse_reg_u8,  |reg| Instruction::DecR8(reg)),
+        value(Instruction::DecMRhl, deref_hl),
+    ))(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, instruction))
+}
+
+fn instruction_addr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("add")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = reg_a_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AddR8 (reg)))
+}
+
+fn instruction_addmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("add")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AddMRhl))
+}
+
+fn instruction_addi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("add")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AddI8 (expr)))
+}
+
+fn instruction_addrhlr16<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("add")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("hl")(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, reg) = parse_reg_u16(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AddRhlR16 (reg)))
+}
+
+fn instruction_addrspi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("add")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("sp")(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AddRspI8 (expr)))
+}
+
+fn instruction_subr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("sub")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = reg_a_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SubR8 (reg)))
+}
+
+fn instruction_submrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("sub")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SubMRhl))
+}
+
+fn instruction_subi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("sub")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SubI8 (expr)))
+}
+
+fn instruction_andr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("and")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = reg_a_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AndR8 (reg)))
+}
+
+fn instruction_andmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("and")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AndMRhl))
+}
+
+fn instruction_andi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("and")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AndI8 (expr)))
+}
+
+fn instruction_orr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("or")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = reg_a_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::OrR8 (reg)))
+}
+
+fn instruction_ormrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("or")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::OrMRhl))
+}
+
+fn instruction_ori8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("or")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::OrI8 (expr)))
+}
+
+fn instruction_adcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("adc")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = reg_a_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AdcR8 (reg)))
+}
+
+fn instruction_adcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("adc")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AdcMRhl))
+}
+
+fn instruction_adci8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("adc")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::AdcI8 (expr)))
+}
+
+fn instruction_sbcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("sbc")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = reg_a_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SbcR8 (reg)))
+}
+
+fn instruction_sbcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("sbc")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SbcMRhl))
+}
+
+fn instruction_sbci8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("sbc")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SbcI8 (expr)))
+}
+
+fn instruction_xorr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("xor")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = reg_a_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::XorR8 (reg)))
+}
+
+fn instruction_xormrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("xor")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::XorMRhl))
+}
+
+fn instruction_xori8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("xor")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::XorI8 (expr)))
+}
+
+fn instruction_cpr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("cp")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = reg_a_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::CpR8 (reg)))
+}
+
+fn instruction_cpmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("cp")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::CpMRhl))
+}
+
+fn instruction_cpi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("cp")(i)?;
+    let (i, _) = opt_reg_a(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::CpI8 (expr)))
+}
+
+fn instruction_ldr8r8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg1) = parse_reg_u8(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, reg2) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdR8R8 (reg1, reg2)))
+}
+
+fn instruction_ldr8i8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdR8I8 (reg, expr)))
+}
+
+fn instruction_ldrsprhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("sp")(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = tag_no_case("hl")(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdRspRhl))
+}
+
+fn instruction_ldmi16rsp<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = char('[')(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = char(']')(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = tag_no_case("sp")(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdMI16Rsp (expr)))
+}
+
+fn instruction_ldmr16ra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, instruction) = alt((
+        value(Instruction::LdMRbcRa, tag_no_case("[bc]")),
+        value(Instruction::LdMRdeRa, tag_no_case("[de]")),
+    ))(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, instruction))
+}
+
+fn instruction_ldramr16<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, instruction) = alt((
+        value(Instruction::LdRaMRbc, tag_no_case("[bc]")),
+        value(Instruction::LdRaMRde, tag_no_case("[de]")),
+    ))(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, instruction))
+}
+
+fn instruction_ldimrhlra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ldi")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdiMRhlRa))
+}
+
+fn instruction_lddmrhlra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ldd")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LddMRhlRa))
+}
+
+fn instruction_ldiramrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ldi")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdiRaMRhl))
+}
+
+fn instruction_lddramrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ldd")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LddRaMRhl))
+}
+
+fn instruction_ldmrhlr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdMRhlR8 (reg)))
+}
+
+fn instruction_ldmrhli8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdMRhlI8 (expr)))
+}
+
+fn instruction_ldr8mrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdR8MRhl (reg)))
+}
+
+fn instruction_ldhramrc<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = char('[')(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("0xFF00")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("+")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("c")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = char(']')(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdhRaMRc))
+}
+
+fn instruction_ldhmrcra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = char('[')(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("0xFF00")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("+")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("c")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = char(']')(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdhMRcRa))
+}
+
+fn instruction_ldhmi8ra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = char('[')(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("0xFF00")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("+")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = char(']')(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdhMI8Ra (expr)))
+}
+
+fn instruction_ldhrami8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = char('[')(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("0xFF00")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("+")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = char(']')(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdhRaMI8 (expr)))
+}
+
+fn instruction_ldrhlrspi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("hl")(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = tag_no_case("sp")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = tag_no_case("+")(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdRhlRspI8 (expr)))
+}
+
+fn instruction_ldmi16ra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = char('[')(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = char(']')(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdMI16Ra (expr)))
+}
+
+fn instruction_ldrami16<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = tag_no_case("a")(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = char('[')(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
+    let (i, _) = char(']')(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdRaMI16 (expr)))
+}
+
+fn instruction_ldr16i16<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("ld")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u16(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::LdR16I16 (reg, expr)))
+}
+
+fn instruction_push<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("push")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u16_push(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Push (reg)))
+}
+
+fn instruction_pop<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("pop")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u16_push(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::Pop (reg)))
+}
+
+fn instruction_rlcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("rlc")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::RlcR8 (reg)))
+}
+
+fn instruction_rlcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("rlc")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::RlcMRhl))
+}
+
+fn instruction_rrcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("rrc")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::RrcR8 (reg)))
+}
+
+fn instruction_rrcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("rrc")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::RrcMRhl))
+}
+
+fn instruction_rlr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("rl")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::RlR8 (reg)))
+}
+
+fn instruction_rlmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("rl")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::RlMRhl))
+}
+
+fn instruction_rrr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("rr")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::RrR8 (reg)))
+}
+
+fn instruction_rrmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("rr")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::RrMRhl))
+}
+
+fn instruction_slar8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("sla")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SlaR8 (reg)))
+}
+
+fn instruction_slamrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("sla")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SlaMRhl))
+}
+
+fn instruction_srar8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("sra")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SraR8 (reg)))
+}
+
+fn instruction_sramrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("sra")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SraMRhl))
+}
+
+fn instruction_swapr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("swap")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SwapR8 (reg)))
+}
+
+fn instruction_swapmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("swap")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SwapMRhl))
+}
+
+fn instruction_srlr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("srl")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SrlR8 (reg)))
+}
+
+fn instruction_srlmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("srl")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SrlMRhl))
+}
+
+fn instruction_bitbitr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("bit")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::BitBitR8 (expr, reg)))
+}
+
+fn instruction_bitbitmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("bit")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::BitBitMRhl (expr)))
+}
+
+fn instruction_resbitr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("res")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::ResBitR8 (expr, reg)))
+}
+
+fn instruction_resbitmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("res")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::ResBitMRhl (expr)))
+}
+
+fn instruction_setbitr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("set")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, reg) = parse_reg_u8(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SetBitR8 (expr, reg)))
+}
+
+fn instruction_setbitmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    let (i, _) = tag_no_case("set")(i)?;
+    let (i, _) = is_a(WHITESPACE)(i)?;
+    let (i, expr) = parse_expr(i)?;
+    let (i, _) = comma_sep(i)?;
+    let (i, _) = deref_hl(i)?;
+    let (i, _) = end_line(i)?;
+    Ok((i, Instruction::SetBitMRhl (expr)))
+}
+
+fn instruction<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+    alt((
+        label,
+        equ,
+        direct_bytes,
+        direct_words,
+        advance_address,
 
         // instructions
-        terminated!(value!(Instruction::Stop, tag_no_case!("stop")), end_line) |
-        terminated!(value!(Instruction::Nop,  tag_no_case!("nop")),  end_line) |
-        terminated!(value!(Instruction::Halt, tag_no_case!("halt")), end_line) |
-        terminated!(value!(Instruction::Di,   tag_no_case!("di")),   end_line) |
-        terminated!(value!(Instruction::Ei,   tag_no_case!("ei")),   end_line) |
-        terminated!(value!(Instruction::Reti, tag_no_case!("reti")), end_line) |
-        terminated!(value!(Instruction::Rrca, tag_no_case!("rrca")), end_line) |
-        terminated!(value!(Instruction::Rra,  tag_no_case!("rra")), end_line) |
-        terminated!(value!(Instruction::Cpl,  tag_no_case!("cpl")), end_line) |
-        terminated!(value!(Instruction::Ccf,  tag_no_case!("ccf")), end_line) |
-        terminated!(value!(Instruction::Rlca, tag_no_case!("rlca")), end_line) |
-        terminated!(value!(Instruction::Rla,  tag_no_case!("rla")), end_line) |
-        terminated!(value!(Instruction::Daa,  tag_no_case!("daa")), end_line) |
-        terminated!(value!(Instruction::Scf,  tag_no_case!("scf")), end_line) |
-        terminated!(value!(Instruction::Ret (Flag::Always),  tag_no_case!("ret")),  end_line) |
-        do_parse!(
-            tag_no_case!("ret") >>
-            is_a!(WHITESPACE) >>
-            flag: parse_flag >>
-            end_line >>
-            (Instruction::Ret (flag))
-        ) |
-        do_parse!(
-            tag_no_case!("call") >>
-            is_a!(WHITESPACE) >>
-            flag: parse_flag >>
-            comma_sep >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::Call (flag, expr))
-        ) |
-        do_parse!(
-            tag_no_case!("call") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::Call (Flag::Always, expr))
-        ) |
-        do_parse!(
-            tag_no_case!("jp") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("hl") >>
-            end_line >>
-            (Instruction::JpRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("jp") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::JpI16 (Flag::Always, expr))
-        ) |
-        do_parse!(
-            tag_no_case!("jp") >>
-            is_a!(WHITESPACE) >>
-            flag: parse_flag >>
-            comma_sep >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::JpI16 (flag, expr))
-        ) |
-        do_parse!(
-            tag_no_case!("jr") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::Jr (Flag::Always, expr))
-        ) |
-        do_parse!(
-            tag_no_case!("jr") >>
-            is_a!(WHITESPACE) >>
-            flag: parse_flag >>
-            comma_sep >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::Jr (flag, expr))
-        ) |
-        do_parse!(
-            tag_no_case!("inc") >>
-            is_a!(WHITESPACE) >>
-            instruction: alt!(
-                do_parse!(reg: parse_reg_u16 >> (Instruction::IncR16 (reg))) |
-                do_parse!(reg: parse_reg_u8  >> (Instruction::IncR8  (reg))) |
-                value!(Instruction::IncMRhl, deref_hl)
-            ) >>
-            end_line >>
-            (instruction)
-        ) |
-        do_parse!(
-            tag_no_case!("dec") >>
-            is_a!(WHITESPACE) >>
-            instruction: alt!(
-                do_parse!(reg: parse_reg_u16 >> (Instruction::DecR16 (reg))) |
-                do_parse!(reg: parse_reg_u8  >> (Instruction::DecR8  (reg))) |
-                value!(Instruction::DecMRhl, deref_hl)
-            ) >>
-            end_line >>
-            (instruction)
-        ) |
-        do_parse!(
-            tag_no_case!("add") >>
-            is_a!(WHITESPACE) >>
-            reg: reg_a_u8 >>
-            end_line >>
-            (Instruction::AddR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("add") >>
-            opt_reg_a >>
-            deref_hl >>
-            end_line >>
-            (Instruction::AddMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("add") >>
-            opt_reg_a >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::AddI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("add") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("hl") >>
-            comma_sep >>
-            reg: parse_reg_u16 >>
-            end_line >>
-            (Instruction::AddRhlR16 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("add") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("sp") >>
-            comma_sep >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::AddRspI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("sub") >>
-            is_a!(WHITESPACE) >>
-            reg: reg_a_u8 >>
-            end_line >>
-            (Instruction::SubR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("sub") >>
-            opt_reg_a >>
-            deref_hl >>
-            end_line >>
-            (Instruction::SubMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("sub") >>
-            opt_reg_a >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::SubI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("and") >>
-            is_a!(WHITESPACE) >>
-            reg: reg_a_u8 >>
-            end_line >>
-            (Instruction::AndR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("and") >>
-            opt_reg_a >>
-            deref_hl >>
-            end_line >>
-            (Instruction::AndMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("and") >>
-            opt_reg_a >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::AndI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("or") >>
-            is_a!(WHITESPACE) >>
-            reg: reg_a_u8 >>
-            end_line >>
-            (Instruction::OrR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("or") >>
-            opt_reg_a >>
-            deref_hl >>
-            end_line >>
-            (Instruction::OrMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("or") >>
-            opt_reg_a >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::OrI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("adc") >>
-            is_a!(WHITESPACE) >>
-            reg: reg_a_u8 >>
-            end_line >>
-            (Instruction::AdcR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("adc") >>
-            opt_reg_a >>
-            deref_hl >>
-            end_line >>
-            (Instruction::AdcMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("adc") >>
-            opt_reg_a >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::AdcI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("sbc") >>
-            is_a!(WHITESPACE) >>
-            reg: reg_a_u8 >>
-            end_line >>
-            (Instruction::SbcR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("sbc") >>
-            opt_reg_a >>
-            deref_hl >>
-            end_line >>
-            (Instruction::SbcMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("sbc") >>
-            opt_reg_a >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::SbcI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("xor") >>
-            is_a!(WHITESPACE) >>
-            reg: reg_a_u8 >>
-            end_line >>
-            (Instruction::XorR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("xor") >>
-            opt_reg_a >>
-            deref_hl >>
-            end_line >>
-            (Instruction::XorMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("xor") >>
-            opt_reg_a >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::XorI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("cp") >>
-            is_a!(WHITESPACE) >>
-            reg: reg_a_u8 >>
-            end_line >>
-            (Instruction::CpR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("cp") >>
-            opt_reg_a >>
-            deref_hl >>
-            end_line >>
-            (Instruction::CpMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("cp") >>
-            opt_reg_a >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::CpI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            reg1: parse_reg_u8 >>
-            comma_sep >>
-            reg2: parse_reg_u8 >>
-            end_line >>
-            (Instruction::LdR8R8 (reg1, reg2))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            reg1: parse_reg_u8 >>
-            comma_sep >>
-            reg2: parse_expr >>
-            end_line >>
-            (Instruction::LdR8I8 (reg1, reg2))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("sp") >>
-            comma_sep >>
-            tag_no_case!("hl") >>
-            end_line >>
-            (Instruction::LdRspRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            char!('[') >>
-            opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr >>
-            opt!(is_a!(WHITESPACE)) >>
-            char!(']') >>
-            comma_sep >>
-            tag_no_case!("sp") >>
-            end_line >>
-            (Instruction::LdMI16Rsp (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            instruction: alt!(
-                value!(Instruction::LdMRbcRa, tag_no_case!("[bc]")) |
-                value!(Instruction::LdMRdeRa, tag_no_case!("[de]"))
-            ) >>
-            comma_sep >>
-            tag_no_case!("a") >>
-            end_line >>
-            (instruction)
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("a") >>
-            comma_sep >>
-            instruction: alt!(
-                value!(Instruction::LdRaMRbc, tag_no_case!("[bc]")) |
-                value!(Instruction::LdRaMRde, tag_no_case!("[de]"))
-            ) >>
-            end_line >>
-            (instruction)
-        ) |
-        do_parse!(
-            tag_no_case!("ldi") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            comma_sep >>
-            tag_no_case!("a") >>
-            end_line >>
-            (Instruction::LdiMRhlRa)
-        ) |
-        do_parse!(
-            tag_no_case!("ldd") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            comma_sep >>
-            tag_no_case!("a") >>
-            end_line >>
-            (Instruction::LddMRhlRa)
-        ) |
-        do_parse!(
-            tag_no_case!("ldi") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("a") >>
-            comma_sep >>
-            deref_hl >>
-            end_line >>
-            (Instruction::LdiRaMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("ldd") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("a") >>
-            comma_sep >>
-            deref_hl >>
-            end_line >>
-            (Instruction::LddRaMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            comma_sep >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::LdMRhlR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            comma_sep >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::LdMRhlI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u8 >>
-            comma_sep >>
-            deref_hl >>
-            end_line >>
-            (Instruction::LdR8MRhl (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("a") >>
-            comma_sep >>
-            char!('[') >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("0xFF00") >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("+") >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("c") >>
-            opt!(is_a!(WHITESPACE)) >>
-            char!(']') >>
-            end_line >>
-            (Instruction::LdhRaMRc)
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            char!('[') >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("0xFF00") >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("+") >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("c") >>
-            opt!(is_a!(WHITESPACE)) >>
-            char!(']') >>
-            comma_sep >>
-            tag_no_case!("a") >>
-            end_line >>
-            (Instruction::LdhMRcRa)
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            char!('[') >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("0xFF00") >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("+") >>
-            opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr >>
-            opt!(is_a!(WHITESPACE)) >>
-            char!(']') >>
-            comma_sep >>
-            tag_no_case!("a") >>
-            end_line >>
-            (Instruction::LdhMI8Ra (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("a") >>
-            comma_sep >>
-            char!('[') >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("0xFF00") >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("+") >>
-            opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr >>
-            opt!(is_a!(WHITESPACE)) >>
-            char!(']') >>
-            end_line >>
-            (Instruction::LdhRaMI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("hl") >>
-            comma_sep >>
-            tag_no_case!("sp") >>
-            opt!(is_a!(WHITESPACE)) >>
-            tag_no_case!("+") >>
-            opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::LdRhlRspI8 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            char!('[') >>
-            opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr >>
-            opt!(is_a!(WHITESPACE)) >>
-            char!(']') >>
-            comma_sep >>
-            tag_no_case!("a") >>
-            end_line >>
-            (Instruction::LdMI16Ra (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            tag_no_case!("a") >>
-            comma_sep >>
-            char!('[') >>
-            opt!(is_a!(WHITESPACE)) >>
-            expr: parse_expr >>
-            opt!(is_a!(WHITESPACE)) >>
-            char!(']') >>
-            end_line >>
-            (Instruction::LdRaMI16 (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("ld") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u16 >>
-            comma_sep >>
-            expr: parse_expr >>
-            end_line >>
-            (Instruction::LdR16I16 (reg, expr))
-        ) |
-        do_parse!(
-            tag_no_case!("push") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u16_push >>
-            end_line >>
-            (Instruction::Push (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("pop") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u16_push >>
-            end_line >>
-            (Instruction::Pop (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("rlc") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::RlcR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("rlc") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            end_line >>
-            (Instruction::RlcMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("rrc") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::RrcR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("rrc") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            end_line >>
-            (Instruction::RrcMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("rl") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::RlR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("rl") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            end_line >>
-            (Instruction::RlMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("rr") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::RrR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("rr") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            end_line >>
-            (Instruction::RrMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("sla") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::SlaR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("sla") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            end_line >>
-            (Instruction::SlaMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("sra") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::SraR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("sra") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            end_line >>
-            (Instruction::SraMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("swap") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::SwapR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("swap") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            end_line >>
-            (Instruction::SwapMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("srl") >>
-            is_a!(WHITESPACE) >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::SrlR8 (reg))
-        ) |
-        do_parse!(
-            tag_no_case!("srl") >>
-            is_a!(WHITESPACE) >>
-            deref_hl >>
-            end_line >>
-            (Instruction::SrlMRhl)
-        ) |
-        do_parse!(
-            tag_no_case!("bit") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            comma_sep >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::BitBitR8 (expr, reg))
-        ) |
-        do_parse!(
-            tag_no_case!("bit") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            comma_sep >>
-            deref_hl >>
-            end_line >>
-            (Instruction::BitBitMRhl (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("res") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            comma_sep >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::ResBitR8 (expr, reg))
-        ) |
-        do_parse!(
-            tag_no_case!("res") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            comma_sep >>
-            deref_hl >>
-            end_line >>
-            (Instruction::ResBitMRhl (expr))
-        ) |
-        do_parse!(
-            tag_no_case!("set") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            comma_sep >>
-            reg: parse_reg_u8 >>
-            end_line >>
-            (Instruction::SetBitR8 (expr, reg))
-        ) |
-        do_parse!(
-            tag_no_case!("set") >>
-            is_a!(WHITESPACE) >>
-            expr: parse_expr >>
-            comma_sep >>
-            deref_hl >>
-            end_line >>
-            (Instruction::SetBitMRhl (expr))
-        ) |
+        alt((
+            terminated(value(Instruction::Stop, tag_no_case("stop")), end_line),
+            terminated(value(Instruction::Nop,  tag_no_case("nop")),  end_line),
+            terminated(value(Instruction::Halt, tag_no_case("halt")), end_line),
+            terminated(value(Instruction::Di,   tag_no_case("di")),   end_line),
+            terminated(value(Instruction::Ei,   tag_no_case("ei")),   end_line),
+            terminated(value(Instruction::Reti, tag_no_case("reti")), end_line),
+            terminated(value(Instruction::Rrca, tag_no_case("rrca")), end_line),
+            terminated(value(Instruction::Rra,  tag_no_case("rra")),  end_line),
+            terminated(value(Instruction::Cpl,  tag_no_case("cpl")),  end_line),
+            terminated(value(Instruction::Ccf,  tag_no_case("ccf")),  end_line),
+            terminated(value(Instruction::Rlca, tag_no_case("rlca")), end_line),
+            terminated(value(Instruction::Rla,  tag_no_case("rla")),  end_line),
+            terminated(value(Instruction::Daa,  tag_no_case("daa")),  end_line),
+            terminated(value(Instruction::Scf,  tag_no_case("scf")),  end_line),
+            terminated(value(Instruction::Ret (Flag::Always), tag_no_case("ret")), end_line),
+        )),
+        alt((
+            instruction_ret,
+            instruction_call_flag,
+            instruction_call_always,
+            instruction_jprhl,
+            instruction_jpi16_always,
+            instruction_jpi16_flag,
+            instruction_jr_always,
+            instruction_jr_flag,
+            instruction_inc,
+            instruction_dec,
+            instruction_addr8,
+            instruction_addmrhl,
+            instruction_addi8,
+            instruction_addrhlr16,
+            instruction_addrspi8,
+            instruction_subr8,
+            instruction_submrhl,
+            instruction_subi8,
+            instruction_andr8,
+            instruction_andmrhl,
+            instruction_andi8,
+        )),
+        alt((
+            instruction_orr8,
+            instruction_ormrhl,
+            instruction_ori8,
+            instruction_adcr8,
+            instruction_adcmrhl,
+            instruction_adci8,
+            instruction_sbcr8,
+            instruction_sbcmrhl,
+            instruction_sbci8,
+            instruction_xorr8,
+            instruction_xormrhl,
+            instruction_xori8,
+            instruction_cpr8,
+            instruction_cpmrhl,
+            instruction_cpi8,
+        )),
+        alt((
+            instruction_ldr8r8,
+            instruction_ldr8i8,
+            instruction_ldrsprhl,
+            instruction_ldmi16rsp,
+            instruction_ldmr16ra,
+            instruction_ldramr16,
+            instruction_ldimrhlra,
+            instruction_lddmrhlra,
+            instruction_ldiramrhl,
+            instruction_lddramrhl,
+            instruction_ldmrhlr8,
+            instruction_ldmrhli8,
+            instruction_ldr8mrhl,
+            instruction_ldhramrc,
+            instruction_ldhmrcra,
+            instruction_ldhmi8ra,
+            instruction_ldhrami8,
+            instruction_ldrhlrspi8,
+            instruction_ldmi16ra,
+            instruction_ldrami16,
+            instruction_ldr16i16,
+        )),
+        alt((
+            instruction_push,
+            instruction_pop,
+            instruction_rlcr8,
+            instruction_rlcmrhl,
+            instruction_rrcr8,
+            instruction_rrcmrhl,
+            instruction_rlr8,
+            instruction_rlmrhl,
+            instruction_rrr8,
+            instruction_rrmrhl,
+            instruction_slar8,
+            instruction_slamrhl,
+            instruction_srar8,
+            instruction_sramrhl,
+            instruction_swapr8,
+            instruction_swapmrhl,
+            instruction_srlr8,
+            instruction_srlmrhl,
+        )),
+        alt((
+            instruction_bitbitr8,
+            instruction_bitbitmrhl,
+            instruction_resbitr8,
+            instruction_resbitmrhl,
+            instruction_setbitr8,
+            instruction_setbitmrhl,
+        )),
 
         // line containing only whitespace/empty
-        value!(Instruction::EmptyLine, end_line)
-    )
-);
+        value(Instruction::EmptyLine, end_line),
+    ))(i)
+}
 
-named!(instructions<CompleteStr, Vec<Option<Instruction>> >,
-    many0!(
-        terminated!(
-            do_parse!(
-                // ignore preceding whitespace
-                opt!(is_a!(WHITESPACE)) >>
+fn instruction_option<'a>(i: &'a str) -> IResult<&'a str, Option<Instruction>, VerboseError<&'a str>> {
+    // ignore preceding whitespace
+    let (i, _) = opt(is_a(WHITESPACE))(i)?;
 
-                // if an instruction fails to parse, it becomes a None and we handle the error later
-                instruction: opt!(instruction) >>
+    // if an instruction fails to parse, it becomes a None and we handle the error later
+    let (i, instruction) = opt(instruction)(i)?;
 
-                // If the instruction is None, then we need to clean up the unparsed line.
-                opt!(is_not!("\r\n")) >>
-                (instruction)
-            ),
+    // If the instruction is None, then we need to clean up the unparsed line.
+    let (i, _) = opt(is_not("\r\n"))(i)?;
+    Ok((i, instruction))
+}
+
+fn instructions<'a>(i: &'a str) -> IResult<&'a str, Vec<Option<Instruction>>, VerboseError<&'a str>> {
+    many0(
+        terminated(
+            instruction_option,
             line_ending
         )
-    )
-);
+    )(i)
+}
 
 /// Parses the text in the provided &str into a Vec<Option<Instruction>>
 /// Instructions are None when that line fails to parse.
@@ -1117,9 +1299,8 @@ pub fn parse_asm(text: &str) -> Result<Vec<Option<Instruction>>, Error> {
         text.push('\n');
     }
 
-    // The CompleteStr disables nom's streaming features, this stops the combinators from returning Incomplete
-    match instructions(CompleteStr(&text)) {
+    match instructions(&text) {
         Ok(instructions) => Ok(instructions.1),
-        Err(err)         => bail!("{}", err), // Convert error to text immediately to avoid lifetime issues
+        Err(err)         => bail!("{:?}", err), // Convert error to text immediately to avoid lifetime issues
     }
 }

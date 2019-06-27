@@ -86,10 +86,10 @@ impl RomBuilder {
     /// Creates a RomBuilder.
     pub fn new() -> Result<RomBuilder, Error> {
         Ok(RomBuilder {
-            data:             vec!(),
-            address:          0,
-            root_dir:         RomBuilder::root_dir()?,
-            constants:        HashMap::new(),
+            data:      vec!(),
+            address:   0,
+            root_dir:  RomBuilder::root_dir()?,
+            constants: HashMap::new(),
         })
     }
 
