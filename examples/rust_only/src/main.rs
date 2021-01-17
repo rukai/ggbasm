@@ -1,4 +1,4 @@
-use failure::Error;
+use anyhow::Error;
 
 use ggbasm::RomBuilder;
 use ggbasm::header::{Header, ColorSupport, CartridgeType, RamType};

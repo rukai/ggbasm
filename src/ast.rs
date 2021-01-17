@@ -4,7 +4,8 @@
 
 use std::collections::HashMap;
 
-use failure::{Error, Fail, bail};
+use anyhow::{Error, bail};
+use thiserror::Error as ThisError;
 use byteorder::{LittleEndian, ByteOrder};
 
 use crate::constants::*;
@@ -134,16 +135,15 @@ impl Expr {
     }
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, ThisError)]
 pub enum ExprRunError {
-    #[fail(display = "Identifier {} can not be found.", _0)]
+    #[error("Identifier {0} can not be found.")]
     MissingIdentifier (String),
-    #[fail(display = "Arithmetic error: {}", _0)]
+    #[error("Arithmetic error: {0}")]
     ArithmeticError (String),
-    #[fail(display = "{}", _0)]
+    #[error("{0}")]
     ResultDoesntFit (String),
 }
-
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct BinaryExpr {

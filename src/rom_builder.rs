@@ -7,8 +7,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::collections::HashMap;
 
-use failure::Error;
-use failure::bail;
+use anyhow::{Error, bail};
 use image;
 
 use crate::header::{Header, CartridgeType};

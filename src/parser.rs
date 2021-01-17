@@ -1,8 +1,7 @@
 //! Parse asm files into an AST.
 
 use byteorder::{LittleEndian, WriteBytesExt};
-use failure::Error;
-use failure::bail;
+use anyhow::{Error, bail};
 use nom::branch::alt;
 use nom::bytes::complete::{is_a, is_not, tag, tag_no_case, take_while_m_n};
 use nom::character::complete::{line_ending, char};

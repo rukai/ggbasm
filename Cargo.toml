@@ -11,7 +11,7 @@ categories = ["game-engines"]
 
 [dependencies]
 nom = "6"
-failure = "0.1"
-failure_derive = "0.1"
+anyhow = "1"
+thiserror = "1"
 byteorder = "1"
 image = "0.23"

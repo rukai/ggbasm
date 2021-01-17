@@ -3,7 +3,7 @@
 //! Various methods are called on the RomBuilder to insert assembly, graphics and raw bytes.
 //!
 //!```
-//! # fn foo() -> Result<(), failure::Error> {
+//! # fn foo() -> Result<(), anyhow::Error> {
 //! # use ggbasm::header::*;
 //! # let colors_map = std::collections::HashMap::new();
 //! # let header = Header {

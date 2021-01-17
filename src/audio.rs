@@ -7,7 +7,7 @@
 //! The audio player that plays the generated audio can be found at:
 //! [audio_player.asm](https://github.com/rukai/ggbasm/blob/master/src/audio_player.asm)
 
-use failure::{Error, bail};
+use anyhow::{Error, bail};
 use crate::ast::{Instruction, Expr};
 
 /// Processes `Vec<AudioLine>` into `Vec<Instruction>` that can be played by the audio player

@@ -6,4 +6,4 @@ edition = '2018'
 
 [dependencies]
 ggbasm = { path = "../.." }
-failure = "0.1"
+anyhow = "1"
