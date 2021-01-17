@@ -188,7 +188,7 @@ impl RomBuilder {
             Err(err) => bail!("Cannot read file {} because: {}", file_name, err),
         };
         let mut bytes = vec!();
-        let image = image.to_rgb();
+        let image = image.to_rgb8();
         for vert_tile in 0..(image.height() / 8) {
             for hor_tile in 0..(image.width() / 8) {
                 for vert_line in 0..8 {

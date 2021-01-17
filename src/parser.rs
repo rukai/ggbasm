@@ -9,7 +9,7 @@ use nom::character::complete::{line_ending, char};
 use nom::combinator::{opt, value, map, peek};
 use nom::error::VerboseError;
 use nom::sequence::{delimited, terminated};
-use nom::multi::{many0, separated_nonempty_list};
+use nom::multi::{many0, separated_list1};
 use nom::IResult;
 
 use crate::ast::*;
@@ -345,7 +345,7 @@ fn equ<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
 fn direct_bytes<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
     let (i, _) = tag_no_case("db")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
-    let (i, value) = separated_nonempty_list(
+    let (i, value) = separated_list1(
         comma_sep,
         alt((
             parse_string,
