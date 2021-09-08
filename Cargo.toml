@@ -10,8 +10,8 @@ keywords = ["gameboy", "assembly", "assembler", "asm", "gb"]
 categories = ["game-engines"]
 
 [dependencies]
-nom = "6"
+nom = "7"
 anyhow = "1"
 thiserror = "1"
 byteorder = "1"
-image = "0.23"
+image = "0.23.14"
