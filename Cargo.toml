@@ -2,7 +2,8 @@
 name = "ggbasm"
 version = "0.3.0"
 authors = ["Rukai <rubickent@gmail.com>"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.56"
 license = "MIT"
 description = "Generating Gameboy Assembler"
 repository = "https://github.com/rukai/ggbasm"
