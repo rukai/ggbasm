@@ -164,22 +164,19 @@ pub fn generate_audio_data(lines: Vec<AudioLine>) -> Result<Vec<Instruction>, Er
 /// Documentation on the input format is given for RomBuilder::add_audio_data.
 /// Each AudioLine cooresponds to a line in the input file. Empty lines are skipped.
 pub fn parse_audio_text(text: &str) -> Result<Vec<AudioLine>, Error> {
-    let mut result = vec![];
-    for (i, line) in text.lines().enumerate() {
-        let tokens: Vec<&str> = line.split_whitespace().collect();
-        // empty lines for formatting are ok
-        if tokens.len() == 0 {
-            continue;
-        }
-        let line = match parse_audio_line(line) {
-            Ok(line) => line,
-            Err(error) => {
-                bail!("Invalid command or values on line {}: {}", i + 1, error);
+    text.lines()
+        .enumerate()
+        .filter_map(|(i, line)| {
+            // empty lines for formatting are skipped
+            if line.split_whitespace().next().is_none() {
+                None
+            } else {
+                Some(parse_audio_line(line).map_err(|e| {
+                    anyhow::anyhow!("Invalid command or values on line {}: {}", i + 1, e)
+                }))
             }
-        };
-        result.push(line);
-    }
-    Ok(result)
+        })
+        .collect()
 }
 
 fn parse_audio_line(line: &str) -> Result<AudioLine, Error> {
@@ -387,6 +384,7 @@ pub enum AudioLine {
 }
 
 /// Represents a Note to be played by a channel
+#[derive(Debug)]
 pub enum Note {
     A,
     B,
@@ -395,20 +393,6 @@ pub enum Note {
     E,
     F,
     G,
-}
-
-impl Note {
-    pub fn to_string(&self) -> String {
-        match self {
-            Note::A => String::from("A"),
-            Note::B => String::from("B"),
-            Note::C => String::from("C"),
-            Note::D => String::from("D"),
-            Note::E => String::from("E"),
-            Note::F => String::from("F"),
-            Note::G => String::from("G"),
-        }
-    }
 }
 
 /// Represents the state of channel 1
@@ -524,7 +508,6 @@ fn note_to_frequency(octave: u8, note: &Note, sharp: bool) -> Result<u16, Error>
         (8, Note::A, false)  => 2011,
         (8, Note::A, true)   => 2013,
         (8, Note::B, false)  => 2015,
-        (octave, note, false) => bail!("Invalid note: {}{}", note.to_string().to_uppercase(), octave),
-        (octave, note, true)  => bail!("Invalid note: {}{}", note.to_string().to_lowercase(), octave)
+        (octave, note, _) => bail!("Invalid note: {}{}", format!("{:?}", note).to_uppercase(), octave),
     })
 }

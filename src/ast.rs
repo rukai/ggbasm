@@ -640,7 +640,7 @@ impl Instruction {
                 };
 
                 // last 3 bits
-                byte |= Instruction::reg8_to_bits(&reg_out);
+                byte |= Instruction::reg8_to_bits(reg_out);
 
                 rom.push(byte);
             }
@@ -841,7 +841,7 @@ impl Instruction {
                 rom.push(0xCB);
                 let byte = 0x40                                    // 0b11000000
                          | (expr.get_bit_index(constants)? * 0x08) // 0b00111000
-                         | Instruction::reg8_to_bits(&reg); // 0b00000111
+                         | Instruction::reg8_to_bits(reg); // 0b00000111
                 rom.push(byte);
             }
             Instruction::BitBitMRhl(expr) => {
@@ -852,7 +852,7 @@ impl Instruction {
                 rom.push(0xCB);
                 let byte = 0x80                                    // 0b11000000
                          | (expr.get_bit_index(constants)? * 0x08) // 0b00111000
-                         | Instruction::reg8_to_bits(&reg); // 0b00000111
+                         | Instruction::reg8_to_bits(reg); // 0b00000111
                 rom.push(byte)
             }
             Instruction::ResBitMRhl(expr) => {
@@ -863,7 +863,7 @@ impl Instruction {
                 rom.push(0xCB);
                 let byte = 0xC0                                    // 0b11000000
                          | (expr.get_bit_index(constants)? * 0x08) // 0b00111000
-                         | Instruction::reg8_to_bits(&reg); // 0b00000111
+                         | Instruction::reg8_to_bits(reg); // 0b00000111
                 rom.push(byte)
             }
             Instruction::SetBitMRhl(expr) => {
@@ -887,7 +887,7 @@ impl Instruction {
     }
 
     /// Returns how many bytes the instruction takes up
-    pub fn len(&self, start_address: u16) -> u16 {
+    pub fn bytes_len(&self, start_address: u16) -> u16 {
         match self {
             Instruction::AdvanceAddress(advance_address) => advance_address - start_address,
             Instruction::EmptyLine => 0,

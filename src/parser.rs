@@ -26,56 +26,56 @@ fn is_dec(input: char) -> bool {
     DEC.contains(input)
 }
 
-fn parse_u8_hex<'a>(i: &'a str) -> IResult<&'a str, u8, VerboseError<&'a str>> {
+fn parse_u8_hex(i: &str) -> IResult<&str, u8, VerboseError<&str>> {
     let (i, _) = tag("0x")(i)?;
     let (i, value) = take_while_m_n(1, 2, is_hex)(i)?;
-    let value = u8::from_str_radix(value.as_ref(), 16).unwrap();
+    let value = u8::from_str_radix(value, 16).unwrap();
     Ok((i, value))
 }
 
-fn parse_u8_dec<'a>(i: &'a str) -> IResult<&'a str, u8, VerboseError<&'a str>> {
+fn parse_u8_dec(i: &str) -> IResult<&str, u8, VerboseError<&str>> {
     let (i, value) = take_while_m_n(1, 3, is_dec)(i)?;
-    let value = u8::from_str_radix(value.as_ref(), 10).unwrap(); // TODO: Handle 255 < x < 1000
+    let value = value.parse().unwrap(); // TODO: Handle 255 < x < 1000
     Ok((i, value))
 }
 
 // TODO: Replace with parse_constant in db and dw, advance_address
-fn parse_u8<'a>(i: &'a str) -> IResult<&'a str, u8, VerboseError<&'a str>> {
+fn parse_u8(i: &str) -> IResult<&str, u8, VerboseError<&str>> {
     alt((parse_u8_hex, parse_u8_dec))(i)
 }
 
-fn parse_u16_hex<'a>(i: &'a str) -> IResult<&'a str, u16, VerboseError<&'a str>> {
+fn parse_u16_hex(i: &str) -> IResult<&str, u16, VerboseError<&str>> {
     let (i, _) = tag("0x")(i)?;
     let (i, value) = take_while_m_n(1, 4, is_hex)(i)?;
-    let value = u16::from_str_radix(value.as_ref(), 16).unwrap();
+    let value = u16::from_str_radix(value, 16).unwrap();
     Ok((i, value))
 }
 
-fn parse_u16_dec<'a>(i: &'a str) -> IResult<&'a str, u16, VerboseError<&'a str>> {
+fn parse_u16_dec(i: &str) -> IResult<&str, u16, VerboseError<&str>> {
     let (i, value) = take_while_m_n(1, 5, is_dec)(i)?;
-    let value = u16::from_str_radix(value.as_ref(), 10).unwrap(); // TODO: Handle 65535 < x < 100000
+    let value = value.parse().unwrap(); // TODO: Handle 65535 < x < 100000
     Ok((i, value))
 }
 
 // TODO: Replace with parse_constant in db and dw, advance_address
-fn parse_u16<'a>(i: &'a str) -> IResult<&'a str, u16, VerboseError<&'a str>> {
+fn parse_u16(i: &str) -> IResult<&str, u16, VerboseError<&str>> {
     alt((parse_u16_hex, parse_u16_dec))(i)
 }
 
-fn parse_constant_hex<'a>(i: &'a str) -> IResult<&'a str, i64, VerboseError<&'a str>> {
+fn parse_constant_hex(i: &str) -> IResult<&str, i64, VerboseError<&str>> {
     let (i, _) = tag("0x")(i)?;
     let (i, value) = take_while_m_n(1, 16, is_hex)(i)?; // TODO: Make this endless, we should really handle all the num to big to parse errors in one case
-    let value = i64::from_str_radix(value.as_ref(), 16).unwrap();
+    let value = i64::from_str_radix(value, 16).unwrap();
     Ok((i, value))
 }
 
-fn parse_constant_dec<'a>(i: &'a str) -> IResult<&'a str, i64, VerboseError<&'a str>> {
+fn parse_constant_dec(i: &str) -> IResult<&str, i64, VerboseError<&str>> {
     let (i, value) = take_while_m_n(1, 20, is_dec)(i)?; // TODO: Make this endless, we should really handle all the num to big to parse errors in one case
-    let value = i64::from_str_radix(value.as_ref(), 10).unwrap(); // TODO: Handle 65535 < x < 100000
+    let value = value.parse().unwrap(); // TODO: Handle 65535 < x < 100000
     Ok((i, value))
 }
 
-fn parse_constant<'a>(i: &'a str) -> IResult<&'a str, i64, VerboseError<&'a str>> {
+fn parse_constant(i: &str) -> IResult<&str, i64, VerboseError<&str>> {
     alt((parse_constant_hex, parse_constant_dec))(i)
 }
 
@@ -85,27 +85,25 @@ fn u16_to_vec(input: u16) -> Vec<u8> {
     result
 }
 
-fn primary_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+fn primary_expr(i: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     alt((
         delimited(char('('), parse_expr, char(')')),
-        map(parse_constant, |value| Expr::Const(value)),
+        map(parse_constant, Expr::Const),
         map(is_a(IDENT), |ident: &str| Expr::Ident(ident.to_string())),
     ))(i)
 }
 
-fn unary_expr_inner<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+fn unary_expr_inner(i: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     let (i, op) = value(UnaryOperator::Minus, char('-'))(i)?;
     let (i, expr) = unary_expr(i)?;
     Ok((i, Expr::unary(expr, op)))
 }
 
-fn unary_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+fn unary_expr(i: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     alt((unary_expr_inner, primary_expr))(i)
 }
 
-fn mult_expr_inner<'a>(
-    i: &'a str,
-) -> IResult<&'a str, (BinaryOperator, Expr), VerboseError<&'a str>> {
+fn mult_expr_inner(i: &str) -> IResult<&str, (BinaryOperator, Expr), VerboseError<&str>> {
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
     let (i, op) = alt((
         value(BinaryOperator::Mul, char('*')),
@@ -117,7 +115,7 @@ fn mult_expr_inner<'a>(
     Ok((i, (op, right)))
 }
 
-fn mult_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+fn mult_expr(i: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     let (i, left) = unary_expr(i)?;
     let left2 = left.clone();
     alt((
@@ -128,9 +126,7 @@ fn mult_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
     ))(i)
 }
 
-fn add_expr_inner<'a>(
-    i: &'a str,
-) -> IResult<&'a str, (BinaryOperator, Expr), VerboseError<&'a str>> {
+fn add_expr_inner(i: &str) -> IResult<&str, (BinaryOperator, Expr), VerboseError<&str>> {
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
     let (i, op) = alt((
         value(BinaryOperator::Add, char('+')),
@@ -141,7 +137,7 @@ fn add_expr_inner<'a>(
     Ok((i, (op, right)))
 }
 
-fn add_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+fn add_expr(i: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     let (i, left) = mult_expr(i)?;
     let left2 = left.clone();
     alt((
@@ -152,9 +148,7 @@ fn add_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
     ))(i)
 }
 
-fn bit_and_expr_inner<'a>(
-    i: &'a str,
-) -> IResult<&'a str, (BinaryOperator, Expr), VerboseError<&'a str>> {
+fn bit_and_expr_inner(i: &str) -> IResult<&str, (BinaryOperator, Expr), VerboseError<&str>> {
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
     let (i, op) = value(BinaryOperator::And, char('&'))(i)?;
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
@@ -162,7 +156,7 @@ fn bit_and_expr_inner<'a>(
     Ok((i, (op, right)))
 }
 
-fn bit_and_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+fn bit_and_expr(i: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     let (i, left) = add_expr(i)?;
     let left2 = left.clone();
     alt((
@@ -173,9 +167,7 @@ fn bit_and_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>>
     ))(i)
 }
 
-fn bit_xor_expr_inner<'a>(
-    i: &'a str,
-) -> IResult<&'a str, (BinaryOperator, Expr), VerboseError<&'a str>> {
+fn bit_xor_expr_inner(i: &str) -> IResult<&str, (BinaryOperator, Expr), VerboseError<&str>> {
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
     let (i, op) = value(BinaryOperator::Xor, char('^'))(i)?;
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
@@ -183,7 +175,7 @@ fn bit_xor_expr_inner<'a>(
     Ok((i, (op, right)))
 }
 
-fn bit_xor_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+fn bit_xor_expr(i: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     let (i, left) = bit_and_expr(i)?;
     let left2 = left.clone();
     alt((
@@ -194,9 +186,7 @@ fn bit_xor_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>>
     ))(i)
 }
 
-fn bit_or_expr_inner<'a>(
-    i: &'a str,
-) -> IResult<&'a str, (BinaryOperator, Expr), VerboseError<&'a str>> {
+fn bit_or_expr_inner(i: &str) -> IResult<&str, (BinaryOperator, Expr), VerboseError<&str>> {
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
     let (i, op) = value(BinaryOperator::Or, char('|'))(i)?;
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
@@ -204,7 +194,7 @@ fn bit_or_expr_inner<'a>(
     Ok((i, (op, right)))
 }
 
-fn bit_or_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+fn bit_or_expr(i: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     let (i, left) = bit_xor_expr(i)?;
     let left2 = left.clone();
     alt((
@@ -215,11 +205,11 @@ fn bit_or_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> 
     ))(i)
 }
 
-fn parse_expr<'a>(i: &'a str) -> IResult<&'a str, Expr, VerboseError<&'a str>> {
+fn parse_expr(i: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     bit_or_expr(i)
 }
 
-fn parse_reg_u8<'a>(i: &'a str) -> IResult<&'a str, Reg8, VerboseError<&'a str>> {
+fn parse_reg_u8(i: &str) -> IResult<&str, Reg8, VerboseError<&str>> {
     alt((
         value(Reg8::A, tag_no_case("a")),
         value(Reg8::B, tag_no_case("b")),
@@ -231,7 +221,7 @@ fn parse_reg_u8<'a>(i: &'a str) -> IResult<&'a str, Reg8, VerboseError<&'a str>>
     ))(i)
 }
 
-fn parse_reg_u16<'a>(i: &'a str) -> IResult<&'a str, Reg16, VerboseError<&'a str>> {
+fn parse_reg_u16(i: &str) -> IResult<&str, Reg16, VerboseError<&str>> {
     alt((
         value(Reg16::BC, tag_no_case("bc")),
         value(Reg16::DE, tag_no_case("de")),
@@ -240,7 +230,7 @@ fn parse_reg_u16<'a>(i: &'a str) -> IResult<&'a str, Reg16, VerboseError<&'a str
     ))(i)
 }
 
-fn parse_reg_u16_push<'a>(i: &'a str) -> IResult<&'a str, Reg16Push, VerboseError<&'a str>> {
+fn parse_reg_u16_push(i: &str) -> IResult<&str, Reg16Push, VerboseError<&str>> {
     alt((
         value(Reg16Push::BC, tag_no_case("bc")),
         value(Reg16Push::DE, tag_no_case("de")),
@@ -249,7 +239,7 @@ fn parse_reg_u16_push<'a>(i: &'a str) -> IResult<&'a str, Reg16Push, VerboseErro
     ))(i)
 }
 
-fn parse_flag<'a>(i: &'a str) -> IResult<&'a str, Flag, VerboseError<&'a str>> {
+fn parse_flag(i: &str) -> IResult<&str, Flag, VerboseError<&str>> {
     alt((
         value(Flag::Z, tag_no_case("z")),
         value(Flag::NZ, tag_no_case("nz")),
@@ -258,7 +248,7 @@ fn parse_flag<'a>(i: &'a str) -> IResult<&'a str, Flag, VerboseError<&'a str>> {
     ))(i)
 }
 
-fn comma_sep<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+fn comma_sep(i: &str) -> IResult<&str, (), VerboseError<&str>> {
     // ignore trailing whitespace
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
     let (i, _) = char(',')(i)?;
@@ -266,14 +256,14 @@ fn comma_sep<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
     Ok((i, ()))
 }
 
-fn comment<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+fn comment(i: &str) -> IResult<&str, (), VerboseError<&str>> {
     let (i, _) = char(';')(i)?;
     let (i, _) = opt(is_not("\r\n"))(i)?;
 
     Ok((i, ()))
 }
 
-fn end_line<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+fn end_line(i: &str) -> IResult<&str, (), VerboseError<&str>> {
     // ignore trailing whitespace
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
 
@@ -286,7 +276,7 @@ fn end_line<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
     Ok((i, ()))
 }
 
-fn reg_a<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+fn reg_a(i: &str) -> IResult<&str, (), VerboseError<&str>> {
     let (i, _) = tag_no_case("a")(i)?;
     let (i, _) = comma_sep(i)?;
     Ok((i, ()))
@@ -294,24 +284,24 @@ fn reg_a<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
 
 // rgbds seems to use an "a" in add, sub etc. fairly unpredictably.
 // So I just made it optional instead of enforcing arbitrary rules.
-fn opt_reg_a<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+fn opt_reg_a(i: &str) -> IResult<&str, (), VerboseError<&str>> {
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = opt(reg_a)(i)?;
     Ok((i, ()))
 }
 
-fn reg_a_u8_inner<'a>(i: &'a str) -> IResult<&'a str, Reg8, VerboseError<&'a str>> {
+fn reg_a_u8_inner(i: &str) -> IResult<&str, Reg8, VerboseError<&str>> {
     let (i, _) = tag_no_case("a")(i)?;
     let (i, _) = comma_sep(i)?;
     parse_reg_u8(i)
 }
 
 // proper backtracking for optional register a followed by a real u8 register
-fn reg_a_u8<'a>(i: &'a str) -> IResult<&'a str, Reg8, VerboseError<&'a str>> {
+fn reg_a_u8(i: &str) -> IResult<&str, Reg8, VerboseError<&str>> {
     alt((reg_a_u8_inner, parse_reg_u8))(i)
 }
 
-fn deref_hl<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
+fn deref_hl(i: &str) -> IResult<&str, (), VerboseError<&str>> {
     let (i, _) = char('[')(i)?;
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
     let (i, _) = tag_no_case("hl")(i)?;
@@ -320,7 +310,7 @@ fn deref_hl<'a>(i: &'a str) -> IResult<&'a str, (), VerboseError<&'a str>> {
     Ok((i, ()))
 }
 
-fn parse_string<'a>(i: &'a str) -> IResult<&'a str, Vec<u8>, VerboseError<&'a str>> {
+fn parse_string(i: &str) -> IResult<&str, Vec<u8>, VerboseError<&str>> {
     delimited(
         char('"'),
         map(is_not("\r\n\""), |value: &str| value.as_bytes().to_vec()),
@@ -328,14 +318,14 @@ fn parse_string<'a>(i: &'a str) -> IResult<&'a str, Vec<u8>, VerboseError<&'a st
     )(i)
 }
 
-fn label<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn label(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, label) = is_a(IDENT)(i)?;
     let (i, _) = char(':')(i)?;
     let (i, _) = end_line(i)?;
     Ok((i, Instruction::Label(label.to_string())))
 }
 
-fn equ<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn equ(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, label) = is_a(IDENT)(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("EQU")(i)?;
@@ -345,7 +335,7 @@ fn equ<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
     Ok((i, Instruction::Equ(label.to_string(), expr)))
 }
 
-fn direct_bytes<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn direct_bytes(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("db")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, value) = separated_list1(
@@ -359,7 +349,7 @@ fn direct_bytes<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'
     ))
 }
 
-fn direct_words<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn direct_words(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("dw")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, value) = parse_u16(i)?;
@@ -367,7 +357,7 @@ fn direct_words<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'
     Ok((i, Instruction::Db(u16_to_vec(value))))
 }
 
-fn advance_address<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn advance_address(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("advance_address")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, value) = parse_u16(i)?;
@@ -375,7 +365,7 @@ fn advance_address<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError
     Ok((i, Instruction::AdvanceAddress(value)))
 }
 
-fn instruction_ret<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ret(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ret")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, flag) = parse_flag(i)?;
@@ -383,7 +373,7 @@ fn instruction_ret<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError
     Ok((i, Instruction::Ret(flag)))
 }
 
-fn instruction_call_flag<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_call_flag(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("call")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, flag) = parse_flag(i)?;
@@ -393,7 +383,7 @@ fn instruction_call_flag<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbos
     Ok((i, Instruction::Call(flag, expr)))
 }
 
-fn instruction_call_always<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_call_always(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("call")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -401,7 +391,7 @@ fn instruction_call_always<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verb
     Ok((i, Instruction::Call(Flag::Always, expr)))
 }
 
-fn instruction_jprhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_jprhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("jp")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("hl")(i)?;
@@ -409,9 +399,7 @@ fn instruction_jprhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::JpRhl))
 }
 
-fn instruction_jpi16_always<'a>(
-    i: &'a str,
-) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_jpi16_always(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("jp")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -419,7 +407,7 @@ fn instruction_jpi16_always<'a>(
     Ok((i, Instruction::JpI16(Flag::Always, expr)))
 }
 
-fn instruction_jpi16_flag<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_jpi16_flag(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("jp")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, flag) = parse_flag(i)?;
@@ -429,7 +417,7 @@ fn instruction_jpi16_flag<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbo
     Ok((i, Instruction::JpI16(flag, expr)))
 }
 
-fn instruction_jr_always<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_jr_always(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("jr")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -437,7 +425,7 @@ fn instruction_jr_always<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbos
     Ok((i, Instruction::Jr(Flag::Always, expr)))
 }
 
-fn instruction_jr_flag<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_jr_flag(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("jr")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, flag) = parse_flag(i)?;
@@ -447,31 +435,31 @@ fn instruction_jr_flag<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::Jr(flag, expr)))
 }
 
-fn instruction_inc<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_inc(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("inc")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, instruction) = alt((
-        map(parse_reg_u16, |reg| Instruction::IncR16(reg)),
-        map(parse_reg_u8, |reg| Instruction::IncR8(reg)),
+        map(parse_reg_u16, Instruction::IncR16),
+        map(parse_reg_u8, Instruction::IncR8),
         value(Instruction::IncMRhl, deref_hl),
     ))(i)?;
     let (i, _) = end_line(i)?;
     Ok((i, instruction))
 }
 
-fn instruction_dec<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_dec(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("dec")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, instruction) = alt((
-        map(parse_reg_u16, |reg| Instruction::DecR16(reg)),
-        map(parse_reg_u8, |reg| Instruction::DecR8(reg)),
+        map(parse_reg_u16, Instruction::DecR16),
+        map(parse_reg_u8, Instruction::DecR8),
         value(Instruction::DecMRhl, deref_hl),
     ))(i)?;
     let (i, _) = end_line(i)?;
     Ok((i, instruction))
 }
 
-fn instruction_addr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_addr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("add")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = reg_a_u8(i)?;
@@ -479,7 +467,7 @@ fn instruction_addr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::AddR8(reg)))
 }
 
-fn instruction_addmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_addmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("add")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, _) = deref_hl(i)?;
@@ -487,7 +475,7 @@ fn instruction_addmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::AddMRhl))
 }
 
-fn instruction_addi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_addi8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("add")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -495,7 +483,7 @@ fn instruction_addi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::AddI8(expr)))
 }
 
-fn instruction_addrhlr16<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_addrhlr16(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("add")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("hl")(i)?;
@@ -505,7 +493,7 @@ fn instruction_addrhlr16<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbos
     Ok((i, Instruction::AddRhlR16(reg)))
 }
 
-fn instruction_addrspi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_addrspi8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("add")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("sp")(i)?;
@@ -515,7 +503,7 @@ fn instruction_addrspi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::AddRspI8(expr)))
 }
 
-fn instruction_subr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_subr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("sub")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = reg_a_u8(i)?;
@@ -523,7 +511,7 @@ fn instruction_subr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::SubR8(reg)))
 }
 
-fn instruction_submrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_submrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("sub")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, _) = deref_hl(i)?;
@@ -531,7 +519,7 @@ fn instruction_submrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::SubMRhl))
 }
 
-fn instruction_subi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_subi8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("sub")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -539,7 +527,7 @@ fn instruction_subi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::SubI8(expr)))
 }
 
-fn instruction_andr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_andr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("and")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = reg_a_u8(i)?;
@@ -547,7 +535,7 @@ fn instruction_andr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::AndR8(reg)))
 }
 
-fn instruction_andmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_andmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("and")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, _) = deref_hl(i)?;
@@ -555,7 +543,7 @@ fn instruction_andmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::AndMRhl))
 }
 
-fn instruction_andi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_andi8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("and")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -563,7 +551,7 @@ fn instruction_andi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::AndI8(expr)))
 }
 
-fn instruction_orr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_orr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("or")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = reg_a_u8(i)?;
@@ -571,7 +559,7 @@ fn instruction_orr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErro
     Ok((i, Instruction::OrR8(reg)))
 }
 
-fn instruction_ormrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ormrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("or")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, _) = deref_hl(i)?;
@@ -579,7 +567,7 @@ fn instruction_ormrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseEr
     Ok((i, Instruction::OrMRhl))
 }
 
-fn instruction_ori8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ori8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("or")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -587,7 +575,7 @@ fn instruction_ori8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErro
     Ok((i, Instruction::OrI8(expr)))
 }
 
-fn instruction_adcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_adcr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("adc")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = reg_a_u8(i)?;
@@ -595,7 +583,7 @@ fn instruction_adcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::AdcR8(reg)))
 }
 
-fn instruction_adcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_adcmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("adc")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, _) = deref_hl(i)?;
@@ -603,7 +591,7 @@ fn instruction_adcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::AdcMRhl))
 }
 
-fn instruction_adci8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_adci8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("adc")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -611,7 +599,7 @@ fn instruction_adci8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::AdcI8(expr)))
 }
 
-fn instruction_sbcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_sbcr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("sbc")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = reg_a_u8(i)?;
@@ -619,7 +607,7 @@ fn instruction_sbcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::SbcR8(reg)))
 }
 
-fn instruction_sbcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_sbcmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("sbc")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, _) = deref_hl(i)?;
@@ -627,7 +615,7 @@ fn instruction_sbcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::SbcMRhl))
 }
 
-fn instruction_sbci8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_sbci8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("sbc")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -635,7 +623,7 @@ fn instruction_sbci8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::SbcI8(expr)))
 }
 
-fn instruction_xorr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_xorr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("xor")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = reg_a_u8(i)?;
@@ -643,7 +631,7 @@ fn instruction_xorr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::XorR8(reg)))
 }
 
-fn instruction_xormrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_xormrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("xor")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, _) = deref_hl(i)?;
@@ -651,7 +639,7 @@ fn instruction_xormrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::XorMRhl))
 }
 
-fn instruction_xori8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_xori8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("xor")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -659,7 +647,7 @@ fn instruction_xori8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::XorI8(expr)))
 }
 
-fn instruction_cpr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_cpr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("cp")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = reg_a_u8(i)?;
@@ -667,7 +655,7 @@ fn instruction_cpr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErro
     Ok((i, Instruction::CpR8(reg)))
 }
 
-fn instruction_cpmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_cpmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("cp")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, _) = deref_hl(i)?;
@@ -675,7 +663,7 @@ fn instruction_cpmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseEr
     Ok((i, Instruction::CpMRhl))
 }
 
-fn instruction_cpi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_cpi8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("cp")(i)?;
     let (i, _) = opt_reg_a(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -683,7 +671,7 @@ fn instruction_cpi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErro
     Ok((i, Instruction::CpI8(expr)))
 }
 
-fn instruction_ldr8r8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldr8r8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg1) = parse_reg_u8(i)?;
@@ -693,7 +681,7 @@ fn instruction_ldr8r8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseEr
     Ok((i, Instruction::LdR8R8(reg1, reg2)))
 }
 
-fn instruction_ldr8i8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldr8i8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u8(i)?;
@@ -703,7 +691,7 @@ fn instruction_ldr8i8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseEr
     Ok((i, Instruction::LdR8I8(reg, expr)))
 }
 
-fn instruction_ldrsprhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldrsprhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("sp")(i)?;
@@ -713,7 +701,7 @@ fn instruction_ldrsprhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdRspRhl))
 }
 
-fn instruction_ldmi16rsp<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldmi16rsp(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = char('[')(i)?;
@@ -727,7 +715,7 @@ fn instruction_ldmi16rsp<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbos
     Ok((i, Instruction::LdMI16Rsp(expr)))
 }
 
-fn instruction_ldmr16ra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldmr16ra(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, instruction) = alt((
@@ -740,7 +728,7 @@ fn instruction_ldmr16ra<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, instruction))
 }
 
-fn instruction_ldramr16<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldramr16(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("a")(i)?;
@@ -753,7 +741,7 @@ fn instruction_ldramr16<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, instruction))
 }
 
-fn instruction_ldimrhlra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldimrhlra(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ldi")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -763,7 +751,7 @@ fn instruction_ldimrhlra<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbos
     Ok((i, Instruction::LdiMRhlRa))
 }
 
-fn instruction_lddmrhlra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_lddmrhlra(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ldd")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -773,7 +761,7 @@ fn instruction_lddmrhlra<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbos
     Ok((i, Instruction::LddMRhlRa))
 }
 
-fn instruction_ldiramrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldiramrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ldi")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("a")(i)?;
@@ -783,7 +771,7 @@ fn instruction_ldiramrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbos
     Ok((i, Instruction::LdiRaMRhl))
 }
 
-fn instruction_lddramrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_lddramrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ldd")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("a")(i)?;
@@ -793,7 +781,7 @@ fn instruction_lddramrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbos
     Ok((i, Instruction::LddRaMRhl))
 }
 
-fn instruction_ldmrhlr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldmrhlr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -803,7 +791,7 @@ fn instruction_ldmrhlr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdMRhlR8(reg)))
 }
 
-fn instruction_ldmrhli8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldmrhli8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -813,7 +801,7 @@ fn instruction_ldmrhli8<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdMRhlI8(expr)))
 }
 
-fn instruction_ldr8mrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldr8mrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u8(i)?;
@@ -823,7 +811,7 @@ fn instruction_ldr8mrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdR8MRhl(reg)))
 }
 
-fn instruction_ldhramrc<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldhramrc(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("a")(i)?;
@@ -841,7 +829,7 @@ fn instruction_ldhramrc<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdhRaMRc))
 }
 
-fn instruction_ldhmrcra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldhmrcra(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = char('[')(i)?;
@@ -859,7 +847,7 @@ fn instruction_ldhmrcra<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdhMRcRa))
 }
 
-fn instruction_ldhmi8ra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldhmi8ra(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = char('[')(i)?;
@@ -877,7 +865,7 @@ fn instruction_ldhmi8ra<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdhMI8Ra(expr)))
 }
 
-fn instruction_ldhrami8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldhrami8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("a")(i)?;
@@ -895,7 +883,7 @@ fn instruction_ldhrami8<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdhRaMI8(expr)))
 }
 
-fn instruction_ldrhlrspi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldrhlrspi8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("hl")(i)?;
@@ -909,7 +897,7 @@ fn instruction_ldrhlrspi8<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbo
     Ok((i, Instruction::LdRhlRspI8(expr)))
 }
 
-fn instruction_ldmi16ra<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldmi16ra(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = char('[')(i)?;
@@ -923,7 +911,7 @@ fn instruction_ldmi16ra<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdMI16Ra(expr)))
 }
 
-fn instruction_ldrami16<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldrami16(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = tag_no_case("a")(i)?;
@@ -937,7 +925,7 @@ fn instruction_ldrami16<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdRaMI16(expr)))
 }
 
-fn instruction_ldr16i16<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_ldr16i16(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("ld")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u16(i)?;
@@ -947,7 +935,7 @@ fn instruction_ldr16i16<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::LdR16I16(reg, expr)))
 }
 
-fn instruction_push<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_push(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("push")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u16_push(i)?;
@@ -955,7 +943,7 @@ fn instruction_push<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErro
     Ok((i, Instruction::Push(reg)))
 }
 
-fn instruction_pop<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_pop(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("pop")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u16_push(i)?;
@@ -963,7 +951,7 @@ fn instruction_pop<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError
     Ok((i, Instruction::Pop(reg)))
 }
 
-fn instruction_rlcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_rlcr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("rlc")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u8(i)?;
@@ -971,7 +959,7 @@ fn instruction_rlcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::RlcR8(reg)))
 }
 
-fn instruction_rlcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_rlcmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("rlc")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -979,7 +967,7 @@ fn instruction_rlcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::RlcMRhl))
 }
 
-fn instruction_rrcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_rrcr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("rrc")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u8(i)?;
@@ -987,7 +975,7 @@ fn instruction_rrcr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::RrcR8(reg)))
 }
 
-fn instruction_rrcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_rrcmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("rrc")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -995,7 +983,7 @@ fn instruction_rrcmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::RrcMRhl))
 }
 
-fn instruction_rlr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_rlr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("rl")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u8(i)?;
@@ -1003,7 +991,7 @@ fn instruction_rlr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErro
     Ok((i, Instruction::RlR8(reg)))
 }
 
-fn instruction_rlmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_rlmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("rl")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -1011,7 +999,7 @@ fn instruction_rlmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseEr
     Ok((i, Instruction::RlMRhl))
 }
 
-fn instruction_rrr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_rrr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("rr")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u8(i)?;
@@ -1019,7 +1007,7 @@ fn instruction_rrr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErro
     Ok((i, Instruction::RrR8(reg)))
 }
 
-fn instruction_rrmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_rrmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("rr")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -1027,7 +1015,7 @@ fn instruction_rrmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseEr
     Ok((i, Instruction::RrMRhl))
 }
 
-fn instruction_slar8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_slar8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("sla")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u8(i)?;
@@ -1035,7 +1023,7 @@ fn instruction_slar8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::SlaR8(reg)))
 }
 
-fn instruction_slamrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_slamrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("sla")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -1043,7 +1031,7 @@ fn instruction_slamrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::SlaMRhl))
 }
 
-fn instruction_srar8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_srar8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("sra")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u8(i)?;
@@ -1051,7 +1039,7 @@ fn instruction_srar8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::SraR8(reg)))
 }
 
-fn instruction_sramrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_sramrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("sra")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -1059,7 +1047,7 @@ fn instruction_sramrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::SraMRhl))
 }
 
-fn instruction_swapr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_swapr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("swap")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u8(i)?;
@@ -1067,7 +1055,7 @@ fn instruction_swapr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseEr
     Ok((i, Instruction::SwapR8(reg)))
 }
 
-fn instruction_swapmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_swapmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("swap")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -1075,7 +1063,7 @@ fn instruction_swapmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::SwapMRhl))
 }
 
-fn instruction_srlr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_srlr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("srl")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, reg) = parse_reg_u8(i)?;
@@ -1083,7 +1071,7 @@ fn instruction_srlr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseErr
     Ok((i, Instruction::SrlR8(reg)))
 }
 
-fn instruction_srlmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_srlmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("srl")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, _) = deref_hl(i)?;
@@ -1091,7 +1079,7 @@ fn instruction_srlmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseE
     Ok((i, Instruction::SrlMRhl))
 }
 
-fn instruction_bitbitr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_bitbitr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("bit")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -1101,7 +1089,7 @@ fn instruction_bitbitr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::BitBitR8(expr, reg)))
 }
 
-fn instruction_bitbitmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_bitbitmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("bit")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -1111,7 +1099,7 @@ fn instruction_bitbitmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbo
     Ok((i, Instruction::BitBitMRhl(expr)))
 }
 
-fn instruction_resbitr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_resbitr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("res")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -1121,7 +1109,7 @@ fn instruction_resbitr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::ResBitR8(expr, reg)))
 }
 
-fn instruction_resbitmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_resbitmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("res")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -1131,7 +1119,7 @@ fn instruction_resbitmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbo
     Ok((i, Instruction::ResBitMRhl(expr)))
 }
 
-fn instruction_setbitr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_setbitr8(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("set")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -1141,7 +1129,7 @@ fn instruction_setbitr8<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbose
     Ok((i, Instruction::SetBitR8(expr, reg)))
 }
 
-fn instruction_setbitmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction_setbitmrhl(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     let (i, _) = tag_no_case("set")(i)?;
     let (i, _) = is_a(WHITESPACE)(i)?;
     let (i, expr) = parse_expr(i)?;
@@ -1151,7 +1139,7 @@ fn instruction_setbitmrhl<'a>(i: &'a str) -> IResult<&'a str, Instruction, Verbo
     Ok((i, Instruction::SetBitMRhl(expr)))
 }
 
-fn instruction<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a str>> {
+fn instruction(i: &str) -> IResult<&str, Instruction, VerboseError<&str>> {
     alt((
         label,
         equ,
@@ -1275,9 +1263,7 @@ fn instruction<'a>(i: &'a str) -> IResult<&'a str, Instruction, VerboseError<&'a
     ))(i)
 }
 
-fn instruction_option<'a>(
-    i: &'a str,
-) -> IResult<&'a str, Option<Instruction>, VerboseError<&'a str>> {
+fn instruction_option(i: &str) -> IResult<&str, Option<Instruction>, VerboseError<&str>> {
     // ignore preceding whitespace
     let (i, _) = opt(is_a(WHITESPACE))(i)?;
 
@@ -1289,9 +1275,7 @@ fn instruction_option<'a>(
     Ok((i, instruction))
 }
 
-fn instructions<'a>(
-    i: &'a str,
-) -> IResult<&'a str, Vec<Option<Instruction>>, VerboseError<&'a str>> {
+fn instructions(i: &str) -> IResult<&str, Vec<Option<Instruction>>, VerboseError<&str>> {
     many0(terminated(instruction_option, line_ending))(i)
 }
 

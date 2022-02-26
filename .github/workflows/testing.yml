@@ -71,9 +71,9 @@ jobs:
       # * clippy also reports rustc warnings and errors
       # * clippy --all-targets causes clippy to run against tests and examples which it doesn't do by default.
       run: |
-        #cargo hack --feature-powerset clippy --all-targets --locked ${{ matrix.cargo_profile }} -- -D warnings
+        cargo hack --feature-powerset clippy --all-targets --locked ${{ matrix.cargo_profile }} -- -D warnings
         cd examples
-        #cargo hack --feature-powerset clippy --all-targets --locked ${{ matrix.cargo_profile }} -- -D warnings
+        cargo hack --feature-powerset clippy --all-targets --locked ${{ matrix.cargo_profile }} -- -D warnings
     - name: Ensure that tests pass under every possible combination of features
       run: |
         cargo hack --feature-powerset test ${{ matrix.cargo_profile }}
