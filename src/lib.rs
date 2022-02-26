@@ -50,13 +50,13 @@
 //! If you are after a lower level api, the [parser] and [ast] modules can be used without the RomBuilder.
 //! You can also construct the ast types yourself and give them to the RomBuilder.
 
-#![recursion_limit="1024"] // Used for large nom parsers
+#![recursion_limit = "1024"] // Used for large nom parsers
 
+pub mod ast;
+pub mod audio;
 pub mod constants;
 pub mod header;
-pub mod ast;
 pub mod parser;
-pub mod audio;
 
 mod rom_builder;
 pub use self::rom_builder::Color;

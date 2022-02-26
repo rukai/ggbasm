@@ -1,7 +1,7 @@
 use anyhow::Error;
 
+use ggbasm::header::{CartridgeType, ColorSupport, Header, RamType};
 use ggbasm::RomBuilder;
-use ggbasm::header::{Header, ColorSupport, CartridgeType, RamType};
 
 fn main() {
     run().unwrap(); // unwrap so that CI will fail on an error
@@ -10,13 +10,13 @@ fn main() {
 
 fn run() -> Result<(), Error> {
     let header = Header {
-        title:          String::from("Ferris"),
-        color_support:  ColorSupport::Unsupported,
-        licence:        String::new(),
-        sgb_support:    false,
+        title: String::from("Ferris"),
+        color_support: ColorSupport::Unsupported,
+        licence: String::new(),
+        sgb_support: false,
         cartridge_type: CartridgeType::Mbc5Ram,
-        ram_type:       RamType::Some32KB,
-        japanese:       false,
+        ram_type: RamType::Some32KB,
+        japanese: false,
         version_number: 0,
     };
 

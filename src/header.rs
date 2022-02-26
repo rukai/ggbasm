@@ -12,16 +12,16 @@ pub enum ColorSupport {
 impl ColorSupport {
     pub fn byte(&self) -> u8 {
         match self {
-            ColorSupport::Unsupported                     => 0x00,
-            ColorSupport::SupportedBackwardsCompatible    => 0x80,
+            ColorSupport::Unsupported => 0x00,
+            ColorSupport::SupportedBackwardsCompatible => 0x80,
             ColorSupport::SupportedNotBackwardsCompatible => 0xC0,
         }
     }
 
     pub fn is_supported(&self) -> bool {
         match self {
-            ColorSupport::Unsupported                     => false,
-            ColorSupport::SupportedBackwardsCompatible    => true,
+            ColorSupport::Unsupported => false,
+            ColorSupport::SupportedBackwardsCompatible => true,
             ColorSupport::SupportedNotBackwardsCompatible => true,
         }
     }
@@ -53,38 +53,38 @@ pub enum CartridgeType {
     PocketCamera,
     HuC3,
     HuC1RamBattery,
-    Unknown (u8)
+    Unknown(u8),
 }
 
 impl CartridgeType {
     pub fn byte(&self) -> u8 {
         match self {
-            CartridgeType::RomOnly              => 0x00,
-            CartridgeType::Mbc1                 => 0x01,
-            CartridgeType::Mbc1Ram              => 0x02,
-            CartridgeType::Mbc1RamBattery       => 0x03,
-            CartridgeType::Mbc2                 => 0x05,
-            CartridgeType::Mbc2Battery          => 0x06,
-            CartridgeType::RomRam               => 0x08,
-            CartridgeType::RomRamBattery        => 0x09,
-            CartridgeType::Mmm01                => 0x0B,
-            CartridgeType::Mmm01Ram             => 0x0C,
-            CartridgeType::Mmm01RamBattery      => 0x0D,
-            CartridgeType::Mbc3TimerBattery     => 0x0F,
-            CartridgeType::Mbc3TimerRamBattery  => 0x10,
-            CartridgeType::Mbc3                 => 0x11,
-            CartridgeType::Mbc3Ram              => 0x12,
-            CartridgeType::Mbc3RamBattery       => 0x13,
-            CartridgeType::Mbc5                 => 0x19,
-            CartridgeType::Mbc5Ram              => 0x1A,
-            CartridgeType::Mbc5RamBattery       => 0x1B,
-            CartridgeType::Mbc5Rumble           => 0x1C,
-            CartridgeType::Mbc5RumbleRam        => 0x1D,
+            CartridgeType::RomOnly => 0x00,
+            CartridgeType::Mbc1 => 0x01,
+            CartridgeType::Mbc1Ram => 0x02,
+            CartridgeType::Mbc1RamBattery => 0x03,
+            CartridgeType::Mbc2 => 0x05,
+            CartridgeType::Mbc2Battery => 0x06,
+            CartridgeType::RomRam => 0x08,
+            CartridgeType::RomRamBattery => 0x09,
+            CartridgeType::Mmm01 => 0x0B,
+            CartridgeType::Mmm01Ram => 0x0C,
+            CartridgeType::Mmm01RamBattery => 0x0D,
+            CartridgeType::Mbc3TimerBattery => 0x0F,
+            CartridgeType::Mbc3TimerRamBattery => 0x10,
+            CartridgeType::Mbc3 => 0x11,
+            CartridgeType::Mbc3Ram => 0x12,
+            CartridgeType::Mbc3RamBattery => 0x13,
+            CartridgeType::Mbc5 => 0x19,
+            CartridgeType::Mbc5Ram => 0x1A,
+            CartridgeType::Mbc5RamBattery => 0x1B,
+            CartridgeType::Mbc5Rumble => 0x1C,
+            CartridgeType::Mbc5RumbleRam => 0x1D,
             CartridgeType::Mbc5RumbleRamBattery => 0x1E,
-            CartridgeType::PocketCamera         => 0xFC,
-            CartridgeType::HuC3                 => 0xFE,
-            CartridgeType::HuC1RamBattery       => 0xFF,
-            CartridgeType::Unknown (value)      => *value,
+            CartridgeType::PocketCamera => 0xFC,
+            CartridgeType::HuC3 => 0xFE,
+            CartridgeType::HuC1RamBattery => 0xFF,
+            CartridgeType::Unknown(value) => *value,
         }
     }
 
@@ -115,7 +115,7 @@ impl CartridgeType {
             0xFC => CartridgeType::PocketCamera,
             0xFE => CartridgeType::HuC3,
             0xFF => CartridgeType::HuC1RamBattery,
-            a    => CartridgeType::Unknown (a)
+            a => CartridgeType::Unknown(a),
         }
     }
 }
@@ -131,10 +131,10 @@ pub enum RamType {
 impl RamType {
     pub fn byte(&self) -> u8 {
         match self {
-            RamType::None     => 0,
-            RamType::Mbc2     => 0,
-            RamType::Some2KB  => 1,
-            RamType::Some8KB  => 2,
+            RamType::None => 0,
+            RamType::Mbc2 => 0,
+            RamType::Some2KB => 1,
+            RamType::Some8KB => 2,
             RamType::Some32KB => 3,
         }
     }
@@ -142,14 +142,14 @@ impl RamType {
 
 pub struct Header {
     /// 11 bytes
-    pub title:          String,
-    pub color_support:  ColorSupport,
+    pub title: String,
+    pub color_support: ColorSupport,
     /// 2 bytes
-    pub licence:        String,
-    pub sgb_support:    bool,
+    pub licence: String,
+    pub sgb_support: bool,
     pub cartridge_type: CartridgeType,
-    pub ram_type:       RamType,
-    pub japanese:       bool,
+    pub ram_type: RamType,
+    pub japanese: bool,
     pub version_number: u8,
 }
 
@@ -190,8 +190,8 @@ impl Header {
     }
 }
 
-static LOGO: [u8; 0x30] = [0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00,
-                           0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89,
-                           0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB,
-                           0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F,
-                           0xBB, 0xB9, 0x33, 0x3E];
+static LOGO: [u8; 0x30] = [
+    0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
+    0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
+    0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
+];
