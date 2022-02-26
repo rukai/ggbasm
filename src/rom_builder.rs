@@ -851,6 +851,9 @@ impl RomBuilder {
     /// working directory and working up through its parents.
     /// Returns the path to the directory the Cargo.toml is in.
     /// Or an error if the file couldn't be found.
+    ///
+    /// TODO: This function returns the wrong path if called like `cargo run -p crate_name` in a workspace.
+    /// The only way to fix this would be get rustc provide an equivalent of env!("CARGO_MANIFEST_DIR") provided at runtime.
     fn root_dir() -> Result<PathBuf, Error> {
         let current_dir = env::current_dir()?;
         let mut current = current_dir.as_path();
